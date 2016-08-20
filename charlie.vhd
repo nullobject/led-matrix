@@ -13,7 +13,7 @@ end charlie;
 architecture charlie_arch of charlie is
   type pwm_type is array (0 to 7) of integer range 0 to 255;
   signal clock_enable : std_logic;
-  signal clock_enable_counter : std_logic_vector(8 downto 0) := (others => '0');
+  signal clock_enable_counter : std_logic_vector(3 downto 0) := (others => '0');
   signal pwm : pwm_type := (7, 15, 31, 63, 127, 255, 255, 255);
 begin
   clock_divider: process(clock)
@@ -29,12 +29,12 @@ begin
     end if;
   end process;
 
-  led_charlie: process(clock, clock_enable)
+  pwm_charlie: process(clock)
     variable pwm_counter : integer range 0 to 255;
-    variable led : integer range 0 to 7;
+    variable led : integer range 0 to 80;
     variable value : std_logic_vector(3 downto 0);
   begin
-    if rising_edge(clock) and clock_enable = '1' then
+    if rising_edge(clock) then
       pwm_counter := pwm_counter + 1;
 
       if pwm_counter = 0 then
