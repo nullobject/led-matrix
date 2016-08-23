@@ -1,45 +1,47 @@
 BUILD_DIR = build
-DEVICE = xc3s500e-4-fg320
-TARGET = charlie
+PART = xc3s500e-4-fg320
+PROJECT = charlie
 
-all: $(BUILD_DIR)/$(TARGET).bit
+all: $(BUILD_DIR)/$(PROJECT).bit
 
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/$(TARGET).ngc: $(TARGET).vhd | $(BUILD_DIR)
+$(BUILD_DIR)/$(PROJECT).ngc: i2c_slave.vhd charlie.vhd $(PROJECT).prj | $(BUILD_DIR)
 	@cd $(BUILD_DIR); \
-	echo "run -ifn ../$(TARGET).vhd -ifmt VHDL -ofn $(TARGET) -p $(DEVICE) -opt_mode Speed -opt_level 1" | xst
+	echo "run -ifn ../$(PROJECT).prj -ifmt mixed -ofn $(PROJECT) -ofmt NGC -p $(PART) -top $(PROJECT) -opt_mode Speed -opt_level 1" | xst
 
-$(BUILD_DIR)/$(TARGET).ngd: spartan-3e.ucf $(BUILD_DIR)/$(TARGET).ngc
+$(BUILD_DIR)/$(PROJECT).ngd: spartan-3e.ucf $(BUILD_DIR)/$(PROJECT).ngc
 	@cd $(BUILD_DIR); \
-	ngd$(BUILD_DIR) -p $(DEVICE) -uc ../spartan-3e.ucf $(TARGET).ngc
+	ngd$(BUILD_DIR) -p $(PART) -uc ../spartan-3e.ucf $(PROJECT).ngc
 
-$(BUILD_DIR)/$(TARGET).ncd: $(BUILD_DIR)/$(TARGET).ngd
+$(BUILD_DIR)/$(PROJECT).ncd: $(BUILD_DIR)/$(PROJECT).ngd
 	@cd $(BUILD_DIR); \
-	map -detail -pr b $(TARGET).ngd
+	map -intstyle ise -p $(PART) \
+		-detail -ir off -ignore_keep_hierarchy -pr b -timing -ol high -logic_opt on \
+		-w -o $(PROJECT).ncd $(PROJECT).ngd $(PROJECT).pcf
 
-# $(TARGET).pcf: $(TARGET).ngd
-# 	@cd $(BUILD_DIR); \
-# 	map -detail -pr b $(TARGET).ngd
-
-$(BUILD_DIR)/parout.ncd: $(BUILD_DIR)/$(TARGET).ncd
+$(BUILD_DIR)/parout.ncd: $(BUILD_DIR)/$(PROJECT).ncd
 	@cd $(BUILD_DIR); \
-	par -w $(TARGET).ncd parout.ncd $(TARGET).pcf
+	par -w $(PROJECT).ncd parout.ncd $(PROJECT).pcf
 
-$(BUILD_DIR)/$(TARGET).bit: $(BUILD_DIR)/parout.ncd
+$(BUILD_DIR)/$(PROJECT).bit: $(BUILD_DIR)/parout.ncd
 	@cd $(BUILD_DIR); \
-	bitgen -g CRC:Enable -g StartUpClk:CClk -g Compress -w parout.ncd $(TARGET).bit $(TARGET).pcf
+	bitgen -g CRC:Enable -g StartUpClk:CClk -g Compress -w parout.ncd $(PROJECT).bit $(PROJECT).pcf
+
+$(BUILD_DIR)/$(PROJECT).bin: $(BUILD_DIR)/$(PROJECT).bit
+	@cd $(BUILD_DIR); \
+	promgen -w -spi -p bin -o ${PROJECT}.bin -s 1024 -u 0 ${PROJECT}.bit
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-program: $(BUILD_DIR)/$(TARGET).bit
+program: $(BUILD_DIR)/$(PROJECT).bit
 	@cd $(BUILD_DIR); \
 	echo "setMode -bs" > impact.cmd; \
 	echo "setCable -port auto" >> impact.cmd; \
 	echo "Identify -inferir" >> impact.cmd; \
-	echo "assignFile -p 1 -file $(TARGET).bit" >> impact.cmd; \
+	echo "assignFile -p 1 -file $(PROJECT).bit" >> impact.cmd; \
 	echo "Program -p 1" >> impact.cmd; \
 	echo "exit" >> impact.cmd; \
 	impact -batch impact.cmd
