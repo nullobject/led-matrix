@@ -243,13 +243,6 @@ begin
         -- Wait for START or STOP to get out of this state
         when read_stop =>
           null;
-
-        -- Wait for START or STOP to get out of this state
-        when others =>
-          assert false
-            report ("I2C: error: ended in an impossible state.")
-            severity error;
-          state_reg <= idle;
       end case;
 
       --------------------------------------------------------
@@ -276,8 +269,8 @@ begin
   ----------------------------------------------------------
   sda <= sda_o_reg when sda_wen_reg = '1' else
          'Z';
-  scl <= scl_o_reg when scl_wen_reg = '1' else
-         'Z';
+  -- scl <= scl_o_reg when scl_wen_reg = '1' else
+  --        'Z';
   ----------------------------------------------------------
   -- User interface
   ----------------------------------------------------------
