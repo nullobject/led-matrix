@@ -8,15 +8,16 @@ entity i2c_slave is
     SLAVE_ADDR : std_logic_vector(6 downto 0)
   );
   port (
-    rst              : in    std_logic;
-    clk              : in    std_logic;
-    scl              : inout std_logic;
-    sda              : inout std_logic;
+    rst : in    std_logic;
+    clk : in    std_logic;
+    scl : in    std_logic;
+    sda : inout std_logic;
+
     -- User interface
-    read_req         : out   std_logic;
-    data_to_master   : in    std_logic_vector(7 downto 0);
-    data_valid       : out   std_logic;
-    data_from_master : out   std_logic_vector(7 downto 0)
+    read_req         : out std_logic;
+    data_to_master   : in  std_logic_vector(7 downto 0);
+    data_valid       : out std_logic;
+    data_from_master : out std_logic_vector(7 downto 0)
   );
 end entity i2c_slave;
 

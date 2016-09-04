@@ -9,10 +9,14 @@ entity charlie is
   port (
     rst     : in std_logic;
     clk     : in std_logic;
+
+    -- Matrix
     rows    : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
     leds    : out std_logic_vector(MATRIX_WIDTH-1 downto 0);
-    buttons : in std_logic_vector(3 downto 0);
-    scl     : inout std_logic;
+    buttons : in  std_logic_vector(3 downto 0);
+
+    -- I2C
+    scl     : in    std_logic;
     sda     : inout std_logic
   );
 end charlie;
@@ -104,9 +108,7 @@ begin
               ram_addr_a <= i2c_data_from_master(ADDR_WIDTH-1 downto 0);
             end if;
           when page_state =>
-            if i2c_data_from_master /= x"00" then
-              -- TODO: Flip page.
-            end if;
+            -- TODO: Flip page.
           when pwm_state =>
             state_reg <= idle_state;
             ram_din_a <= i2c_data_from_master;

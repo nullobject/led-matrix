@@ -23,7 +23,7 @@ entity matrix_driver is
 end matrix_driver;
 
 architecture arch of matrix_driver is
-  signal leds_reg, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0) := (others => '0');
+  signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0) := (others => '0');
 begin
   leds <= leds_out when oe = '0' else (others => '0');
 
@@ -31,17 +31,17 @@ begin
   process(rst, clk, led)
   begin
     if rst = '1' then
-      leds_reg <= (others => '0');
+      leds_in <= (others => '0');
     elsif rising_edge(clk) then
-      leds_reg <= leds_reg(MATRIX_WIDTH-2 downto 0) & led;
+      leds_in <= leds_in(MATRIX_WIDTH-2 downto 0) & led;
     end if;
   end process;
 
   -- Latch the LEDs on the rising edge of the `lat` input.
-  process(lat, leds_reg)
+  process(lat, leds_in)
   begin
     if rising_edge(lat) then
-      leds_out <= leds_reg;
+      leds_out <= leds_in;
     end if;
   end process;
 
