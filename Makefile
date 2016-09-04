@@ -7,13 +7,13 @@ all: $(BUILD_DIR)/$(PROJECT).bit
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(BUILD_DIR)/$(PROJECT).ngc: i2c_slave.vhd charlie.vhd $(PROJECT).prj | $(BUILD_DIR)
+$(BUILD_DIR)/$(PROJECT).ngc: clock_divider.vhd config.vhd debounce.vhd display.vhd i2c_slave.vhd matrix_driver.vhd memory.vhd top.vhd $(PROJECT).prj | $(BUILD_DIR)
 	@cd $(BUILD_DIR); \
 	echo "run -ifn ../$(PROJECT).prj -ifmt mixed -ofn $(PROJECT) -ofmt NGC -p $(PART) -top $(PROJECT) -opt_mode Speed -opt_level 1" | xst
 
 $(BUILD_DIR)/$(PROJECT).ngd: spartan-3e.ucf $(BUILD_DIR)/$(PROJECT).ngc
 	@cd $(BUILD_DIR); \
-	ngd$(BUILD_DIR) -p $(PART) -uc ../spartan-3e.ucf $(PROJECT).ngc
+	ngdbuild -aul -p $(PART) -uc ../spartan-3e.ucf $(PROJECT).ngc
 
 $(BUILD_DIR)/$(PROJECT).ncd: $(BUILD_DIR)/$(PROJECT).ngd
 	@cd $(BUILD_DIR); \

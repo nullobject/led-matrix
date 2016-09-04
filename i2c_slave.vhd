@@ -2,18 +2,16 @@ library ieee;
 
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use ieee.std_logic_misc.all;
 
 entity i2c_slave is
   generic (
-    SLAVE_ADDR : std_logic_vector(6 downto 0);
-    DEBOUNCE_LENGTH : natural := 4
+    SLAVE_ADDR : std_logic_vector(6 downto 0)
   );
   port (
+    rst              : in    std_logic;
+    clk              : in    std_logic;
     scl              : inout std_logic;
     sda              : inout std_logic;
-    clk              : in    std_logic;
-    rst              : in    std_logic;
     -- User interface
     read_req         : out   std_logic;
     data_to_master   : in    std_logic_vector(7 downto 0);
@@ -44,9 +42,6 @@ architecture arch of i2c_slave is
   signal data_reg             : std_logic_vector(6 downto 0) := (others => '0');
   signal data_from_master_reg : std_logic_vector(7 downto 0) := (others => '0');
 
-  signal scl_pipeline : std_logic_vector(DEBOUNCE_LENGTH-1 downto 0) := (others => '0');
-  signal sda_pipeline : std_logic_vector(DEBOUNCE_LENGTH-1 downto 0) := (others => '0');
-
   signal scl_reg, scl_prev_reg : std_logic := '1';
   signal sda_reg, sda_prev_reg : std_logic := '1';
 
@@ -63,25 +58,25 @@ architecture arch of i2c_slave is
   signal read_req_reg       : std_logic                    := '0';
   signal data_to_master_reg : std_logic_vector(7 downto 0) := (others => '0');
 begin
+  scl_debouncer : entity work.debounce
+    port map (
+      clk  => clk,
+      rst  => rst,
+      din  => scl,
+      dout => scl_reg
+    );
+
+  sda_debouncer : entity work.debounce
+    port map (
+      clk  => clk,
+      rst  => rst,
+      din  => sda,
+      dout => sda_reg
+    );
+
   process(clk) is
   begin
     if rising_edge(clk) then
-      scl_pipeline <= scl_pipeline(scl_pipeline'length-2 downto 0) & scl;
-
-      if or_reduce(scl_pipeline) = '0' then
-        scl_reg <= '0';
-      elsif and_reduce(scl_pipeline) = '1' then
-        scl_reg <= '1';
-      end if;
-
-      sda_pipeline <= sda_pipeline(sda_pipeline'length-2 downto 0) & sda;
-
-      if or_reduce(sda_pipeline) = '0' then
-        sda_reg <= '0';
-      elsif and_reduce(sda_pipeline) = '1' then
-        sda_reg <= '1';
-      end if;
-
       -- Delay SCL by 1 and 2 clock cycles
       scl_prev_reg <= scl_reg;
 
@@ -130,7 +125,6 @@ begin
       read_req_reg   <= '0';
 
       case state_reg is
-
         when idle =>
           if start_reg = '1' then
             state_reg          <= get_address_and_cmd;
@@ -267,10 +261,7 @@ begin
   ----------------------------------------------------------
   -- I2C interface
   ----------------------------------------------------------
-  sda <= sda_o_reg when sda_wen_reg = '1' else
-         'Z';
-  -- scl <= scl_o_reg when scl_wen_reg = '1' else
-  --        'Z';
+  sda <= sda_o_reg when sda_wen_reg = '1' else 'Z';
   ----------------------------------------------------------
   -- User interface
   ----------------------------------------------------------
