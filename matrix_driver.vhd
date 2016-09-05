@@ -11,10 +11,11 @@ entity matrix_driver is
     clk : in std_logic;
 
     -- Display IO
-    row_addr : in std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
+    load     : in std_logic;
     led      : in std_logic;
     lat      : in std_logic;
     oe       : in std_logic;
+    row_addr : in std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
 
     -- Matrix IO
     rows : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
@@ -25,26 +26,6 @@ end matrix_driver;
 architecture arch of matrix_driver is
   signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0) := (others => '0');
 begin
-  leds <= leds_out when oe = '0' else (others => '0');
-
-  -- Data on the `led` input is loaded on each rising edge of the `clk` signal.
-  process(rst, clk, led)
-  begin
-    if rst = '1' then
-      leds_in <= (others => '0');
-    elsif rising_edge(clk) then
-      leds_in <= leds_in(MATRIX_WIDTH-2 downto 0) & led;
-    end if;
-  end process;
-
-  -- Latch the LEDs on the rising edge of the `lat` input.
-  process(lat, leds_in)
-  begin
-    if rising_edge(lat) then
-      leds_out <= leds_in;
-    end if;
-  end process;
-
   with row_addr select
     rows <= "10000000" when "111",
             "01000000" when "110",
@@ -54,4 +35,34 @@ begin
             "00000100" when "010",
             "00000010" when "001",
             "00000001" when others;
+
+  -- Data on the `led` input is loaded on each rising edge of the `clk` signal.
+  process(rst, clk)
+  begin
+    if rst = '1' then
+      leds_in <= (others => '0');
+    elsif rising_edge(clk) and load = '1' then
+      leds_in <= leds_in(MATRIX_WIDTH-2 downto 0) & led;
+    end if;
+  end process;
+
+  -- Latch the LEDs when the `lat` signal is high.
+  process(clk)
+  begin
+    if rising_edge(clk) and lat = '1' then
+      leds_out <= leds_in;
+    end if;
+  end process;
+
+  -- Output the LEDs when the `oe` signal is low.
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if oe = '0' then
+        leds <= leds_out;
+      else
+        leds <= (others => '0');
+      end if;
+    end if;
+  end process;
 end arch;

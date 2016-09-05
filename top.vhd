@@ -28,11 +28,11 @@ architecture arch of charlie is
   signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
   signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
 
-  signal display_clk      : std_logic := '0';
-  signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0) := (others => '0');
+  signal display_load     : std_logic := '0';
   signal display_led      : std_logic := '0';
   signal display_lat      : std_logic := '0';
   signal display_oe       : std_logic := '0';
+  signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0) := (others => '0');
 
   signal i2c_read_req         : std_logic := '0';
   signal i2c_data_to_master   : std_logic_vector(7 downto 0) := (others => '0');
@@ -56,12 +56,12 @@ begin
   display : entity work.display
     port map (
       rst      => rst,
-      clk_in   => clk,
-      clk_out  => display_clk,
-      row_addr => display_row_addr,
+      clk      => clk,
+      load     => display_load,
       led      => display_led,
       lat      => display_lat,
       oe       => display_oe,
+      row_addr => display_row_addr,
       addr     => ram_addr_b,
       data     => ram_dout_b
     );
@@ -69,11 +69,12 @@ begin
   matrix_driver : entity work.matrix_driver
     port map (
       rst      => rst,
-      clk      => display_clk,
-      row_addr => display_row_addr,
+      clk      => clk,
+      load     => display_load,
       led      => display_led,
       lat      => display_lat,
       oe       => display_oe,
+      row_addr => display_row_addr,
       rows     => rows,
       leds     => leds
     );
