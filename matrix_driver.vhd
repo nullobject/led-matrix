@@ -26,16 +26,6 @@ end matrix_driver;
 architecture arch of matrix_driver is
   signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0) := (others => '0');
 begin
-  with row_addr select
-    rows <= "10000000" when "111",
-            "01000000" when "110",
-            "00100000" when "101",
-            "00010000" when "100",
-            "00001000" when "011",
-            "00000100" when "010",
-            "00000010" when "001",
-            "00000001" when others;
-
   -- Data on the `led` input is loaded on each rising edge of the `clk` signal.
   process(rst, clk)
   begin
@@ -65,4 +55,14 @@ begin
       end if;
     end if;
   end process;
+
+  with row_addr select
+    rows <= "10000000" when "111",
+            "01000000" when "110",
+            "00100000" when "101",
+            "00010000" when "100",
+            "00001000" when "011",
+            "00000100" when "010",
+            "00000010" when "001",
+            "00000001" when others;
 end arch;

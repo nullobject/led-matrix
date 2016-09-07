@@ -1,5 +1,5 @@
-NET "clk" LOC = "C9" | IOSTANDARD = LVTTL;
-NET "clk" PERIOD = 20.0ns HIGH 40%;
+NET "clk" LOC = "C9" | IOSTANDARD = LVTTL | TNM_NET = "clk";
+TIMESPEC "ts_clk" = PERIOD "clk" 20 ns HIGH 50%;
 
 NET "rows<0>" LOC = "A14" | IOSTANDARD = LVTTL | SLEW = FAST | DRIVE = 8;
 NET "rows<1>" LOC = "B14" | IOSTANDARD = LVTTL | SLEW = FAST | DRIVE = 8;

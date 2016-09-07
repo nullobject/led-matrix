@@ -1,14 +1,12 @@
 library ieee;
-
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-
 use work.automata.all;
 
 entity charlie is
   port (
-    rst     : in std_logic;
-    clk     : in std_logic;
+    rst_in : in std_logic;
+    clk : in std_logic;
 
     -- Matrix
     rows    : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
@@ -16,8 +14,8 @@ entity charlie is
     buttons : in  std_logic_vector(3 downto 0);
 
     -- I2C
-    scl     : in    std_logic;
-    sda     : inout std_logic
+    scl : in    std_logic;
+    sda : inout std_logic
   );
 end charlie;
 
@@ -41,11 +39,23 @@ architecture arch of charlie is
 
   type state is (idle_state, page_state, pwm_state);
   signal state_reg : state := idle_state;
+
+  signal clk10, clk100, locked, rst : std_logic;
 begin
+  clock_generator : entity work.clock_generator
+    port map (
+  		clkin_in        => clk,
+      rst_in          => rst_in,
+  		clkfx_out       => clk10,
+  		clkin_ibufg_out => open,
+  		clk0_out        => clk100,
+      locked_out      => locked
+  	);
+
   memory : entity work.memory
     port map (
       rst    => rst,
-      clk    => clk,
+      clk    => clk100,
       we     => ram_we,
       addr_a => ram_addr_a,
       addr_b => ram_addr_b,
@@ -56,7 +66,7 @@ begin
   display : entity work.display
     port map (
       rst      => rst,
-      clk      => clk,
+      clk      => clk10,
       load     => display_load,
       led      => display_led,
       lat      => display_lat,
@@ -69,7 +79,7 @@ begin
   matrix_driver : entity work.matrix_driver
     port map (
       rst      => rst,
-      clk      => clk,
+      clk      => clk10,
       load     => display_load,
       led      => display_led,
       lat      => display_lat,
@@ -85,7 +95,7 @@ begin
     )
     port map (
       rst              => rst,
-      clk              => clk,
+      clk              => clk100,
       scl              => scl,
       sda              => sda,
       read_req         => i2c_read_req,
@@ -94,9 +104,9 @@ begin
       data_from_master => i2c_data_from_master
     );
 
-  i2c_handler : process(clk, state_reg, ram_addr_a, i2c_data_valid, i2c_read_req, i2c_data_from_master)
+  i2c_handler : process(clk100, state_reg, ram_addr_a, i2c_data_valid, i2c_read_req, i2c_data_from_master)
   begin
-    if rising_edge(clk) then
+    if rising_edge(clk100) then
       if i2c_data_valid = '1' then
         ram_we <= '0';
 
@@ -122,4 +132,6 @@ begin
       end if;
     end if;
   end process;
+
+  rst <= not locked;
 end arch;
