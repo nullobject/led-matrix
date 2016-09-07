@@ -89,6 +89,17 @@ begin
       leds     => leds
     );
 
+  button_driver : entity work.button_driver
+    port map (
+      rst      => rst,
+      clk      => clk100,
+      row_addr => display_row_addr,
+      addr     => ram_addr_a,
+      data     => ram_din_a,
+      we       => ram_we,
+      buttons  => buttons
+    );
+
   i2c : entity work.i2c_slave
     generic map (
       SLAVE_ADDR => "0000011"
@@ -104,36 +115,36 @@ begin
       data_from_master => i2c_data_from_master
     );
 
-  i2c_handler : process(rst, clk100)
-  begin
-    if rst = '1' then
-      state_reg <= idle_state;
-    elsif rising_edge(clk100) then
-      if i2c_data_valid = '1' then
-        ram_we <= '0';
-
-        case state_reg is
-          when idle_state =>
-            if i2c_data_from_master = x"40" then
-              state_reg <= page_state;
-            else
-              state_reg <= pwm_state;
-              ram_addr_a <= i2c_data_from_master(ADDR_WIDTH-1 downto 0);
-            end if;
-          when page_state =>
-            -- TODO: Flip page.
-          when pwm_state =>
-            state_reg <= idle_state;
-            ram_din_a <= i2c_data_from_master;
-            ram_we <= '1';
-        end case;
-      end if;
-
-      if i2c_read_req = '1' then
-        i2c_data_to_master <= x"12";
-      end if;
-    end if;
-  end process;
+  -- i2c_handler : process(rst, clk100)
+  -- begin
+  --   if rst = '1' then
+  --     state_reg <= idle_state;
+  --   elsif rising_edge(clk100) then
+  --     if i2c_data_valid = '1' then
+  --       ram_we <= '0';
+  --
+  --       case state_reg is
+  --         when idle_state =>
+  --           if i2c_data_from_master = x"40" then
+  --             state_reg <= page_state;
+  --           else
+  --             state_reg <= pwm_state;
+  --             ram_addr_a <= i2c_data_from_master(ADDR_WIDTH-1 downto 0);
+  --           end if;
+  --         when page_state =>
+  --           -- TODO: Flip page.
+  --         when pwm_state =>
+  --           state_reg <= idle_state;
+  --           ram_din_a <= i2c_data_from_master;
+  --           ram_we <= '1';
+  --       end case;
+  --     end if;
+  --
+  --     if i2c_read_req = '1' then
+  --       i2c_data_to_master <= x"12";
+  --     end if;
+  --   end if;
+  -- end process;
 
   rst <= not locked;
 end arch;
