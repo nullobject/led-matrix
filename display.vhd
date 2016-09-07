@@ -26,15 +26,15 @@ end display;
 architecture arch of display is
   -- Essential state machine signals
   type state_type is (read_pixel_data, incr_ram_addr, incr_row_addr, latch);
-  signal state, next_state : state_type := read_pixel_data;
+  signal state, next_state : state_type;
 
   -- State machine signals
-  signal bpp_count, next_bpp_count : unsigned(MATRIX_BPP-1 downto 0) := (others => '0');
-  signal s_row_addr, next_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0) := (others => '0');
-  signal s_ram_addr, next_ram_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
-  signal s_led, next_led           : std_logic := '0';
-  signal s_oe, next_oe             : std_logic := '0';
-  signal inc_row, next_inc_row     : std_logic := '0';
+  signal bpp_count, next_bpp_count : unsigned(MATRIX_BPP-1 downto 0);
+  signal s_row_addr, next_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
+  signal s_ram_addr, next_ram_addr : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal s_led, next_led           : std_logic;
+  signal s_oe, next_oe             : std_logic;
+  signal inc_row, next_inc_row     : std_logic;
   signal s_load, s_lat             : std_logic;
 begin
   load     <= s_load;

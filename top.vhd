@@ -20,25 +20,25 @@ entity charlie is
 end charlie;
 
 architecture arch of charlie is
-  signal ram_we     : std_logic := '0';
-  signal ram_addr_a : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
-  signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
-  signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
-  signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+  signal ram_we     : std_logic;
+  signal ram_addr_a : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
 
-  signal display_load     : std_logic := '0';
-  signal display_led      : std_logic := '0';
-  signal display_lat      : std_logic := '0';
-  signal display_oe       : std_logic := '0';
-  signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0) := (others => '0');
+  signal display_load     : std_logic;
+  signal display_led      : std_logic;
+  signal display_lat      : std_logic;
+  signal display_oe       : std_logic;
+  signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
 
-  signal i2c_read_req         : std_logic := '0';
-  signal i2c_data_to_master   : std_logic_vector(7 downto 0) := (others => '0');
-  signal i2c_data_valid       : std_logic := '0';
-  signal i2c_data_from_master : std_logic_vector(7 downto 0) := (others => '0');
+  signal i2c_read_req         : std_logic;
+  signal i2c_data_to_master   : std_logic_vector(7 downto 0);
+  signal i2c_data_valid       : std_logic;
+  signal i2c_data_from_master : std_logic_vector(7 downto 0);
 
   type state is (idle_state, page_state, pwm_state);
-  signal state_reg : state := idle_state;
+  signal state_reg : state;
 
   signal clk10, clk100, locked, rst : std_logic;
 begin
@@ -104,9 +104,11 @@ begin
       data_from_master => i2c_data_from_master
     );
 
-  i2c_handler : process(clk100, state_reg, ram_addr_a, i2c_data_valid, i2c_read_req, i2c_data_from_master)
+  i2c_handler : process(rst, clk100)
   begin
-    if rising_edge(clk100) then
+    if rst = '1' then
+      state_reg <= idle_state;
+    elsif rising_edge(clk100) then
       if i2c_data_valid = '1' then
         ram_we <= '0';
 

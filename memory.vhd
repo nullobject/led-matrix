@@ -7,8 +7,8 @@ use work.automata.all;
 
 entity memory is
   port (
-    rst    : in std_logic;
-    clk    : in std_logic;
+    rst : in std_logic;
+    clk : in std_logic;
 
     -- Input
     we     : in std_logic;

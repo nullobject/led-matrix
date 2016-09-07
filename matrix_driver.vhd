@@ -24,7 +24,7 @@ entity matrix_driver is
 end matrix_driver;
 
 architecture arch of matrix_driver is
-  signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0) := (others => '0');
+  signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0);
 begin
   -- Data on the `led` input is loaded on each rising edge of the `clk` signal.
   process(rst, clk)

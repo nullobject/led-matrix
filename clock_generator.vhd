@@ -26,6 +26,7 @@ begin
   gnd_bit <= '0';
   clkin_ibufg_out <= clkin_ibufg;
   clk0_out <= clkfb_in;
+
   clkfx_bufg_inst : bufg
     port map (
       i => clkfx_buf,
