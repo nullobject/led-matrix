@@ -11,6 +11,7 @@ entity charlie is
     -- Matrix
     rows    : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
     leds    : out std_logic_vector(MATRIX_WIDTH-1 downto 0);
+    -- buttons : in  std_logic_vector(MATRIX_WIDTH-1 downto 0);
     buttons : in  std_logic_vector(3 downto 0);
 
     -- I2C

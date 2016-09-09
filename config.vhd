@@ -8,7 +8,7 @@ package automata is
   constant MATRIX_BPP    : natural := 8; -- number of bits per pixel
 
   constant DATA_WIDTH : natural := MATRIX_BPP;
-  constant ADDR_WIDTH : natural := natural(log2(real(MATRIX_HEIGHT*MATRIX_WIDTH/2))) + 1;
+  constant ADDR_WIDTH : natural := 6;
 
   constant MATRIX_HEIGHT_LOG2 : natural := natural(log2(real(MATRIX_HEIGHT)));
   constant MATRIX_WIDTH_LOG2  : natural := natural(log2(real(MATRIX_WIDTH)));

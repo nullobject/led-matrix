@@ -19,23 +19,26 @@ entity button_driver is
     we   : out  std_logic;
 
     -- Matrix IO
+    -- buttons : in std_logic_vector(MATRIX_WIDTH-1 downto 0)
     buttons : in std_logic_vector(3 downto 0)
   );
 end button_driver;
 
 architecture arch of button_driver is
+  signal counter : unsigned(2 downto 0) := (others => '0');
 begin
   process(rst, clk)
   begin
     if rst = '1' then
     elsif rising_edge(clk) then
       we <= '1';
-      addr <= "000000";
-      if buttons(0) = '1' then
+      addr <= row_addr & std_logic_vector(counter);
+      if buttons(to_integer(counter)) = '1' then
         data <= x"ff";
       else
         data <= x"00";
       end if;
+      counter <= counter + 1;
     end if;
   end process;
 end arch;
