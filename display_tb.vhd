@@ -61,4 +61,12 @@ begin
     end if;
     wait for clk_period;
   end process;
+
+  process
+  begin
+    rst <= '1';
+    wait for clk_period/2;
+    rst <= '0';
+    wait;
+  end process;
 end architecture;

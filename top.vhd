@@ -11,8 +11,7 @@ entity charlie is
     -- Matrix
     rows    : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
     leds    : out std_logic_vector(MATRIX_WIDTH-1 downto 0);
-    -- buttons : in  std_logic_vector(MATRIX_WIDTH-1 downto 0);
-    buttons : in  std_logic_vector(3 downto 0);
+    buttons : in  std_logic_vector(MATRIX_WIDTH-1 downto 0);
 
     -- I2C
     scl : in    std_logic;
@@ -41,7 +40,7 @@ architecture arch of charlie is
   type state is (idle_state, page_state, pwm_state);
   signal state_reg : state;
 
-  signal clk10, clk100, locked, rst : std_logic;
+  signal clk10, clk50, locked, rst : std_logic;
 begin
   clock_generator : entity work.clock_generator
     port map (
@@ -49,14 +48,14 @@ begin
       rst_in          => rst_in,
   		clkfx_out       => clk10,
   		clkin_ibufg_out => open,
-  		clk0_out        => clk100,
+      clk0_out        => clk50,
       locked_out      => locked
   	);
 
   memory : entity work.memory
     port map (
       rst    => rst,
-      clk    => clk100,
+      clk    => clk50,
       we     => ram_we,
       addr_a => ram_addr_a,
       addr_b => ram_addr_b,
@@ -93,7 +92,7 @@ begin
   button_driver : entity work.button_driver
     port map (
       rst      => rst,
-      clk      => clk100,
+      clk      => clk50,
       row_addr => display_row_addr,
       addr     => ram_addr_a,
       data     => ram_din_a,
@@ -107,7 +106,7 @@ begin
     )
     port map (
       rst              => rst,
-      clk              => clk100,
+      clk              => clk50,
       scl              => scl,
       sda              => sda,
       read_req         => i2c_read_req,
@@ -116,11 +115,11 @@ begin
       data_from_master => i2c_data_from_master
     );
 
-  -- i2c_handler : process(rst, clk100)
+  -- i2c_handler : process(rst, clk50)
   -- begin
   --   if rst = '1' then
   --     state_reg <= idle_state;
-  --   elsif rising_edge(clk100) then
+  --   elsif rising_edge(clk50) then
   --     if i2c_data_valid = '1' then
   --       ram_we <= '0';
   --

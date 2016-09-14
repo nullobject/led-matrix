@@ -19,8 +19,7 @@ entity button_driver is
     we   : out  std_logic;
 
     -- Matrix IO
-    -- buttons : in std_logic_vector(MATRIX_WIDTH-1 downto 0)
-    buttons : in std_logic_vector(3 downto 0)
+    buttons : in std_logic_vector(MATRIX_WIDTH-1 downto 0)
   );
 end button_driver;
 
