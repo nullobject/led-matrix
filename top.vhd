@@ -1,4 +1,5 @@
 library ieee;
+
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.automata.all;
@@ -89,31 +90,31 @@ begin
       leds     => leds
     );
 
-  button_driver : entity work.button_driver
-    port map (
-      rst      => rst,
-      clk      => clk50,
-      row_addr => display_row_addr,
-      addr     => ram_addr_a,
-      data     => ram_din_a,
-      we       => ram_we,
-      buttons  => buttons
-    );
+  -- button_driver : entity work.button_driver
+  --   port map (
+  --     rst      => rst,
+  --     clk      => clk50,
+  --     row_addr => display_row_addr,
+  --     addr     => ram_addr_a,
+  --     data     => ram_din_a,
+  --     we       => ram_we,
+  --     buttons  => buttons
+  --   );
 
-  i2c : entity work.i2c_slave
-    generic map (
-      SLAVE_ADDR => "0000011"
-    )
-    port map (
-      rst              => rst,
-      clk              => clk50,
-      scl              => scl,
-      sda              => sda,
-      read_req         => i2c_read_req,
-      data_to_master   => i2c_data_to_master,
-      data_valid       => i2c_data_valid,
-      data_from_master => i2c_data_from_master
-    );
+  -- i2c : entity work.i2c_slave
+  --   generic map (
+  --     SLAVE_ADDR => "0000011"
+  --   )
+  --   port map (
+  --     rst              => rst,
+  --     clk              => clk50,
+  --     scl              => scl,
+  --     sda              => sda,
+  --     read_req         => i2c_read_req,
+  --     data_to_master   => i2c_data_to_master,
+  --     data_valid       => i2c_data_valid,
+  --     data_from_master => i2c_data_from_master
+  --   );
 
   -- i2c_handler : process(rst, clk50)
   -- begin

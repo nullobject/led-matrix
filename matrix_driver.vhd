@@ -5,6 +5,8 @@ use ieee.numeric_std.all;
 
 use work.automata.all;
 
+-- This entity implements a LED matrix driver. It converts display IO signals
+-- into row and column signals to drive a LED matrix.
 entity matrix_driver is
   port (
     rst : in std_logic;
@@ -26,7 +28,7 @@ end matrix_driver;
 architecture arch of matrix_driver is
   signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0);
 begin
-  -- Data on the `led` input is loaded on each rising edge of the `clk` signal.
+  -- Data on the `led` input is loaded when the `load` signal is high on each rising edge of the `clk` signal.
   process(rst, clk)
   begin
     if rst = '1' then

@@ -5,6 +5,7 @@ use ieee.numeric_std.all;
 
 use work.automata.all;
 
+-- This entity defines a dual-port RAM.
 entity memory is
   port (
     rst : in std_logic;
@@ -23,7 +24,26 @@ end memory;
 
 architecture arch of memory is
   type ram_type is array (0 to 2**ADDR_WIDTH-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal ram : ram_type;
+  -- FIXME: remove the initial values.
+  signal ram : ram_type := (
+    0 => x"0f",
+    1 => x"1f",
+    2 => x"2f",
+    3 => x"3f",
+    4 => x"4f",
+    5 => x"5f",
+    6 => x"6f",
+    7 => x"7f",
+    8 => x"8f",
+    9 => x"9f",
+    10 => x"af",
+    11 => x"bf",
+    12 => x"cf",
+    13 => x"df",
+    14 => x"ef",
+    15 => x"ff",
+    others => (others => '0')
+  );
 begin
   process(clk, we, addr_a, din_a)
   begin
