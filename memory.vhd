@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 use work.automata.all;
 
--- This entity defines a dual-port RAM.
+-- This entity implements a dual-port asynchronous RAM.
 entity memory is
   port (
     rst : in std_logic;
@@ -42,6 +42,22 @@ architecture arch of memory is
     13 => x"df",
     14 => x"ef",
     15 => x"ff",
+    48 => x"0f",
+    49 => x"1f",
+    50 => x"2f",
+    51 => x"3f",
+    52 => x"4f",
+    53 => x"5f",
+    54 => x"6f",
+    55 => x"7f",
+    56 => x"8f",
+    57 => x"9f",
+    58 => x"af",
+    59 => x"bf",
+    60 => x"cf",
+    61 => x"df",
+    62 => x"ef",
+    63 => x"ff",
     others => (others => '0')
   );
 begin

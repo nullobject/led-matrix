@@ -14,9 +14,15 @@ entity charlie is
     leds    : out std_logic_vector(MATRIX_WIDTH-1 downto 0);
     buttons : in  std_logic_vector(MATRIX_WIDTH-1 downto 0);
 
-    -- I2C
-    scl : in    std_logic;
-    sda : inout std_logic
+    -- -- I2C
+    -- scl : in    std_logic;
+    -- sda : inout std_logic;
+
+    -- SPI
+    ss   : in std_logic;
+    sck  : in std_logic;
+    mosi : in std_logic;
+    miso : out std_logic
   );
 end charlie;
 
@@ -33,13 +39,16 @@ architecture arch of charlie is
   signal display_oe       : std_logic;
   signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
 
-  signal i2c_read_req         : std_logic;
-  signal i2c_data_to_master   : std_logic_vector(7 downto 0);
-  signal i2c_data_valid       : std_logic;
-  signal i2c_data_from_master : std_logic_vector(7 downto 0);
+  -- signal i2c_read_req         : std_logic;
+  -- signal i2c_data_to_master   : std_logic_vector(7 downto 0);
+  -- signal i2c_data_valid       : std_logic;
+  -- signal i2c_data_from_master : std_logic_vector(7 downto 0);
 
-  type state is (idle_state, page_state, pwm_state);
-  signal state_reg : state;
+  -- type state is (idle_state, page_state, pwm_state);
+  -- signal state_reg : state;
+
+  signal spi_rx_data  : std_logic_vector(7 downto 0);
+  signal spi_rx_valid : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
@@ -88,6 +97,18 @@ begin
       row_addr => display_row_addr,
       rows     => rows,
       leds     => leds
+    );
+
+  spi_slave : entity work.spi_slave
+    generic map (N => 8)
+    port map (
+      clk_i      => clk50,
+      spi_ssel_i => ss,
+      spi_sck_i  => sck,
+      spi_mosi_i => mosi,
+      spi_miso_o => miso,
+      do_o       => spi_rx_data,
+      do_valid_o => spi_rx_valid
     );
 
   -- button_driver : entity work.button_driver

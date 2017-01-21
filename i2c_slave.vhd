@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 entity i2c_slave is
   generic (
-    SLAVE_ADDR : std_logic_vector(6 downto 0)
+    slave_addr : std_logic_vector(6 downto 0)
   );
   port (
     rst : in    std_logic;
@@ -145,7 +145,7 @@ begin
 
           if bits_processed_reg = 8 and scl_falling_reg = '1' then
             bits_processed_reg <= 0;
-            if addr_reg = SLAVE_ADDR then  -- check req address
+            if addr_reg = slave_addr then  -- check req address
               state_reg <= answer_ack_start;
               if cmd_reg = '1' then  -- issue read request
                 read_req_reg       <= '1';

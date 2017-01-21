@@ -15,8 +15,8 @@ entity button_driver is
 
     -- Memory IO
     addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    data : out  std_logic_vector(DATA_WIDTH-1 downto 0);
-    we   : out  std_logic;
+    data : out std_logic_vector(DATA_WIDTH-1 downto 0);
+    we   : out std_logic;
 
     -- Matrix IO
     buttons : in std_logic_vector(MATRIX_WIDTH-1 downto 0)
