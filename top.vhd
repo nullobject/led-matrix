@@ -44,11 +44,13 @@ architecture arch of charlie is
   -- signal i2c_data_valid       : std_logic;
   -- signal i2c_data_from_master : std_logic_vector(7 downto 0);
 
-  -- type state is (idle_state, page_state, pwm_state);
-  -- signal state_reg : state;
+  type state is (idle_state, page_state, pwm_state);
+  signal state_reg : state;
 
   signal spi_rx_data  : std_logic_vector(7 downto 0);
   signal spi_rx_valid : std_logic;
+  signal spi_rx_prev : std_logic;
+  signal spi_rx_next : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
@@ -110,6 +112,36 @@ begin
       do_o       => spi_rx_data,
       do_valid_o => spi_rx_valid
     );
+
+  spi_handler : process(rst, clk50)
+  begin
+    if rst = '1' or ss = '1' then
+      state_reg <= idle_state;
+      spi_rx_next <= '0';
+      spi_rx_prev <= '0';
+    elsif rising_edge(clk50) then
+      spi_rx_next <= spi_rx_valid;
+      spi_rx_prev <= spi_rx_next;
+
+      if spi_rx_prev = '0' and spi_rx_next = '1' then
+        case state_reg is
+          when idle_state =>
+            if spi_rx_data = x"40" then
+              state_reg <= page_state;
+            else
+              state_reg <= pwm_state;
+              ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
+            end if;
+          when page_state =>
+            -- TODO: Flip page.
+          when pwm_state =>
+            state_reg <= idle_state;
+            ram_din_a <= spi_rx_data;
+            ram_we <= '1';
+        end case;
+      end if;
+    end if;
+  end process;
 
   -- button_driver : entity work.button_driver
   --   port map (
