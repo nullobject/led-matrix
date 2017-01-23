@@ -44,13 +44,11 @@ architecture arch of charlie is
   -- signal i2c_data_valid       : std_logic;
   -- signal i2c_data_from_master : std_logic_vector(7 downto 0);
 
-  type state is (idle_state, page_state, pwm_state);
-  signal state_reg : state;
+  type state_t is (idle_state, addr_state, data_state);
+  signal state : state_t;
 
   signal spi_rx_data  : std_logic_vector(7 downto 0);
-  signal spi_rx_valid : std_logic;
-  signal spi_rx_prev : std_logic;
-  signal spi_rx_next : std_logic;
+  signal spi_done : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
@@ -102,44 +100,39 @@ begin
     );
 
   spi_slave : entity work.spi_slave
-    generic map (N => 8)
     port map (
-      clk_i      => clk50,
-      spi_ssel_i => ss,
-      spi_sck_i  => sck,
-      spi_mosi_i => mosi,
-      spi_miso_o => miso,
-      do_o       => spi_rx_data,
-      do_valid_o => spi_rx_valid
+      reset => rst,
+      clk => clk50,
+      spi_ss => ss,
+      spi_clk => sck,
+      spi_mosi => mosi,
+      spi_miso => miso,
+      spi_done => spi_done,
+      DataRxd => spi_rx_data,
+      DataToTxLoad => '0',
+      DataToTx => (others => '0')
     );
 
   spi_handler : process(rst, clk50)
   begin
-    if rst = '1' or ss = '1' then
-      state_reg <= idle_state;
-      spi_rx_next <= '0';
-      spi_rx_prev <= '0';
+    if rst = '1' then
+      state <= idle_state;
     elsif rising_edge(clk50) then
-      spi_rx_next <= spi_rx_valid;
-      spi_rx_prev <= spi_rx_next;
-
-      if spi_rx_prev = '0' and spi_rx_next = '1' then
-        case state_reg is
-          when idle_state =>
-            if spi_rx_data = x"40" then
-              state_reg <= page_state;
-            else
-              state_reg <= pwm_state;
-              ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
-            end if;
-          when page_state =>
-            -- TODO: Flip page.
-          when pwm_state =>
-            state_reg <= idle_state;
-            ram_din_a <= spi_rx_data;
-            ram_we <= '1';
-        end case;
-      end if;
+      ram_we <= '0';
+      case state is
+      when idle_state =>
+        if spi_done = '1' then
+          ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
+          state <= data_state;
+        end if;
+      when data_state =>
+        if spi_done = '1' then
+          ram_we <= '1';
+          ram_din_a <= spi_rx_data;
+          state <= idle_state;
+        end if;
+      when others =>
+      end case;
     end if;
   end process;
 
