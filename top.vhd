@@ -102,7 +102,7 @@ begin
   spi_slave : entity work.spi_slave
     port map (
       reset => rst,
-      clk => clk50,
+      clk => clk10,
       spi_ss => ss,
       spi_clk => sck,
       spi_mosi => mosi,

@@ -69,7 +69,7 @@ begin
   end process;
 
   -- Next-state logic
-  process(state, bpp_count, s_row_addr, s_ram_addr, s_led, s_oe, data) is
+  process(state, bpp_count, s_row_addr, s_ram_addr, s_led, s_oe, data, inc_row) is
   begin
     -- Default register next-state assignments
     next_bpp_count <= bpp_count;

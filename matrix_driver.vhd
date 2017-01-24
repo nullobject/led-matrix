@@ -29,7 +29,7 @@ architecture arch of matrix_driver is
   signal leds_in, leds_out : std_logic_vector(MATRIX_WIDTH-1 downto 0);
 begin
   -- Data on the `led` input is loaded when the `load` signal is high on each rising edge of the `clk` signal.
-  process(rst, clk)
+  process(rst, clk, load)
   begin
     if rst = '1' then
       leds_in <= (others => '0');
@@ -39,7 +39,7 @@ begin
   end process;
 
   -- Latch the LEDs when the `lat` signal is high.
-  process(clk)
+  process(clk, lat)
   begin
     if rising_edge(clk) and lat = '1' then
       leds_out <= leds_in;
