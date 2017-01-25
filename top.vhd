@@ -9,16 +9,12 @@ entity charlie is
     rst_in : in std_logic;
     clk : in std_logic;
 
-    -- Display
+    -- Display IO
     rows    : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
     cols    : out std_logic_vector(DISPLAY_WIDTH-1 downto 0);
     buttons : in  std_logic_vector(DISPLAY_WIDTH-1 downto 0);
 
-    -- -- I2C
-    -- scl : in    std_logic;
-    -- sda : inout std_logic;
-
-    -- SPI
+    -- SPI IO
     ss   : in std_logic;
     sck  : in std_logic;
     mosi : in std_logic;
@@ -29,19 +25,14 @@ end charlie;
 architecture arch of charlie is
   signal ram_we     : std_logic;
   signal ram_addr_a : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
-
-  -- signal i2c_read_req         : std_logic;
-  -- signal i2c_data_to_master   : std_logic_vector(7 downto 0);
-  -- signal i2c_data_valid       : std_logic;
-  -- signal i2c_data_from_master : std_logic_vector(7 downto 0);
 
   type state_t is (idle_state, addr_state, data_state);
   signal state : state_t;
 
-  signal spi_rx_data  : std_logic_vector(7 downto 0);
+  signal spi_rx_data  : std_logic_vector(DATA_WIDTH-1 downto 0);
   signal spi_done : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
@@ -57,6 +48,10 @@ begin
   	);
 
   memory : entity work.memory
+    generic map (
+      addr_width => ADDR_WIDTH,
+      data_width => DATA_WIDTH
+    )
     port map (
       rst    => rst,
       clk    => clk50,
@@ -124,52 +119,6 @@ begin
   --     we       => ram_we,
   --     buttons  => buttons
   --   );
-
-  -- i2c : entity work.i2c_slave
-  --   generic map (
-  --     SLAVE_ADDR => "0000011"
-  --   )
-  --   port map (
-  --     rst              => rst,
-  --     clk              => clk50,
-  --     scl              => scl,
-  --     sda              => sda,
-  --     read_req         => i2c_read_req,
-  --     data_to_master   => i2c_data_to_master,
-  --     data_valid       => i2c_data_valid,
-  --     data_from_master => i2c_data_from_master
-  --   );
-
-  -- i2c_handler : process(rst, clk50)
-  -- begin
-  --   if rst = '1' then
-  --     state_reg <= idle_state;
-  --   elsif rising_edge(clk50) then
-  --     if i2c_data_valid = '1' then
-  --       ram_we <= '0';
-  --
-  --       case state_reg is
-  --         when idle_state =>
-  --           if i2c_data_from_master = x"40" then
-  --             state_reg <= page_state;
-  --           else
-  --             state_reg <= pwm_state;
-  --             ram_addr_a <= i2c_data_from_master(ADDR_WIDTH-1 downto 0);
-  --           end if;
-  --         when page_state =>
-  --           -- TODO: Flip page.
-  --         when pwm_state =>
-  --           state_reg <= idle_state;
-  --           ram_din_a <= i2c_data_from_master;
-  --           ram_we <= '1';
-  --       end case;
-  --     end if;
-  --
-  --     if i2c_read_req = '1' then
-  --       i2c_data_to_master <= x"12";
-  --     end if;
-  --   end if;
-  -- end process;
 
   rst <= not locked;
 end arch;

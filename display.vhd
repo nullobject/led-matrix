@@ -43,13 +43,13 @@ architecture arch of display is
 begin
   gamma : entity work.gamma
     generic map (
-      gamma => 2.8,
-      width => DISPLAY_BPP
+      gamma      => 2.8,
+      data_width => DATA_WIDTH
     )
     port map (
-      clk       => clk,
-      value_in  => ram_data,
-      value_out => pixel
+      clk      => clk,
+      data_in  => ram_data,
+      data_out => pixel
     );
 
   ram_addr <= addr;
@@ -60,7 +60,7 @@ begin
     if rst = '1' then
       state     <= read_pixel_data;
       bpp_count <= (others => '0');
-      row  <= (others => '0');
+      row       <= (others => '0');
       addr      <= (others => '0');
       led       <= '0';
       inc_row   <= '0';
