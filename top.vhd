@@ -82,8 +82,8 @@ begin
       lat      => display_lat,
       oe       => display_oe,
       row_addr => display_row_addr,
-      addr     => ram_addr_b,
-      data     => ram_dout_b
+      ram_addr => ram_addr_b,
+      ram_data => ram_dout_b
     );
 
   matrix_driver : entity work.matrix_driver

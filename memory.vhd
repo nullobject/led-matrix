@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 use work.automata.all;
 
--- This entity implements a dual-port asynchronous RAM.
+-- This block implements a dual-port asynchronous RAM.
 entity memory is
   port (
     rst : in std_logic;

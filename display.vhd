@@ -20,12 +20,15 @@ entity display is
     row_addr : out std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
 
     -- Memory IO
-    addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    data : in  std_logic_vector(DATA_WIDTH-1 downto 0)
+    ram_addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
+    ram_data : in  std_logic_vector(DATA_WIDTH-1 downto 0)
   );
 end display;
 
 architecture arch of display is
+  -- The current pixel value.
+  signal pixel : std_logic_vector(7 downto 0);
+
   -- Essential state machine signals
   type state_type is (read_pixel_data, incr_ram_addr, incr_row_addr, latch);
   signal state, next_state : state_type;
@@ -39,12 +42,22 @@ architecture arch of display is
   signal inc_row, next_inc_row     : std_logic;
   signal s_load, s_lat             : std_logic;
 begin
+  gamma : entity work.gamma
+    generic map (
+      gamma => 2.8
+    )
+    port map (
+      clk       => clk,
+      value_in  => ram_data,
+      value_out => pixel
+    );
+
   load     <= s_load;
   led      <= s_led;
   lat      <= s_lat;
   oe       <= s_oe;
   row_addr <= s_row_addr;
-  addr     <= s_ram_addr;
+  ram_addr <= s_ram_addr;
 
   -- State register
   process(rst, clk)
@@ -69,7 +82,7 @@ begin
   end process;
 
   -- Next-state logic
-  process(state, bpp_count, s_row_addr, s_ram_addr, s_led, s_oe, data, inc_row) is
+  process(state, bpp_count, s_row_addr, s_ram_addr, s_led, s_oe, pixel, inc_row) is
   begin
     -- Default register next-state assignments
     next_bpp_count <= bpp_count;
@@ -86,7 +99,7 @@ begin
     -- States
     case state is
       when read_pixel_data =>
-        if unsigned(data) > bpp_count then
+        if unsigned(pixel) > bpp_count then
           next_led <= '1';
         end if;
 
