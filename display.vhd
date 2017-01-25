@@ -12,16 +12,13 @@ entity display is
     rst : in std_logic;
     clk : in std_logic;
 
-    -- Display IO
-    load     : out std_logic;
-    led      : out std_logic;
-    lat      : out std_logic;
-    oe       : out std_logic;
-    row_addr : out std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
-
     -- Memory IO
     ram_addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    ram_data : in  std_logic_vector(DATA_WIDTH-1 downto 0)
+    ram_data : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+
+    -- Display IO
+    display_rows : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
+    display_cols : out std_logic_vector(DISPLAY_WIDTH-1 downto 0)
   );
 end display;
 
@@ -34,17 +31,20 @@ architecture arch of display is
   signal state, next_state : state_type;
 
   -- State machine signals
-  signal bpp_count, next_bpp_count : unsigned(MATRIX_BPP-1 downto 0);
-  signal s_row_addr, next_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
-  signal s_ram_addr, next_ram_addr : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal s_led, next_led           : std_logic;
-  signal s_oe, next_oe             : std_logic;
+  signal bpp_count, next_bpp_count : unsigned(DISPLAY_BPP-1 downto 0);
+  signal row, next_row             : std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
+  signal addr, next_addr           : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal led, next_led             : std_logic;
+  signal oe, next_oe               : std_logic;
   signal inc_row, next_inc_row     : std_logic;
-  signal s_load, s_lat             : std_logic;
+  signal load, lat                 : std_logic;
+
+  signal leds_in, leds_out : std_logic_vector(DISPLAY_WIDTH-1 downto 0);
 begin
   gamma : entity work.gamma
     generic map (
-      gamma => 2.8
+      gamma => 2.8,
+      width => DISPLAY_BPP
     )
     port map (
       clk       => clk,
@@ -52,49 +52,44 @@ begin
       value_out => pixel
     );
 
-  load     <= s_load;
-  led      <= s_led;
-  lat      <= s_lat;
-  oe       <= s_oe;
-  row_addr <= s_row_addr;
-  ram_addr <= s_ram_addr;
+  ram_addr <= addr;
 
   -- State register
   process(rst, clk)
   begin
     if rst = '1' then
-      state      <= read_pixel_data;
-      bpp_count  <= (others => '0');
-      s_row_addr <= (others => '0');
-      s_ram_addr <= (others => '0');
-      s_led      <= '0';
-      inc_row    <= '0';
-      s_oe       <= '0';
+      state     <= read_pixel_data;
+      bpp_count <= (others => '0');
+      row  <= (others => '0');
+      addr      <= (others => '0');
+      led       <= '0';
+      inc_row   <= '0';
+      oe        <= '0';
     elsif rising_edge(clk) then
-      state      <= next_state;
-      bpp_count  <= next_bpp_count;
-      s_row_addr <= next_row_addr;
-      s_ram_addr <= next_ram_addr;
-      s_led      <= next_led;
-      inc_row    <= next_inc_row;
-      s_oe       <= next_oe;
+      state     <= next_state;
+      bpp_count <= next_bpp_count;
+      row       <= next_row;
+      addr      <= next_addr;
+      led       <= next_led;
+      inc_row   <= next_inc_row;
+      oe        <= next_oe;
     end if;
   end process;
 
   -- Next-state logic
-  process(state, bpp_count, s_row_addr, s_ram_addr, s_led, s_oe, pixel, inc_row) is
+  process(state, bpp_count, row, addr, led, oe, pixel, inc_row) is
   begin
     -- Default register next-state assignments
     next_bpp_count <= bpp_count;
-    next_row_addr  <= s_row_addr;
-    next_ram_addr  <= s_ram_addr;
+    next_row       <= row;
+    next_addr      <= addr;
     next_led       <= '0';
-    next_oe        <= s_oe;
+    next_oe        <= oe;
     next_inc_row   <= inc_row;
 
     -- Default signal assignments
-    s_load <= '0';
-    s_lat  <= '0';
+    load <= '0';
+    lat  <= '0';
 
     -- States
     case state is
@@ -107,15 +102,15 @@ begin
 
       when incr_ram_addr =>
         -- Pulse the output clock.
-        s_load <= '1';
+        load <= '1';
 
-        if s_ram_addr(2 downto 0) = "111" then
+        if addr(2 downto 0) = "111" then
           if inc_row = '1' then
             next_inc_row <= '0';
             next_oe <= '1';
             next_state <= incr_row_addr;
-          elsif bpp_count = unsigned(to_signed(-1, MATRIX_BPP)) then
-            next_ram_addr <= std_logic_vector(unsigned(s_ram_addr) + 1);
+          elsif bpp_count = unsigned(to_signed(-1, DISPLAY_BPP)) then
+            next_addr <= std_logic_vector(unsigned(addr) + 1);
             next_inc_row <= '1';
             next_state <= latch;
           else
@@ -123,26 +118,66 @@ begin
           end if;
           next_bpp_count <= bpp_count + 1;
         else
-          next_ram_addr <= std_logic_vector(unsigned(s_ram_addr) + 1);
+          next_addr <= std_logic_vector(unsigned(addr) + 1);
           next_state <= read_pixel_data;
         end if;
 
       when incr_row_addr =>
         -- Increment the row address.
-        next_row_addr <= std_logic_vector(unsigned(s_row_addr) + 1);
+        next_row <= std_logic_vector(unsigned(row) + 1);
 
         next_state <= latch;
 
       when latch =>
         -- Latch the row.
-        s_lat <= '1';
+        lat <= '1';
 
         -- Enable the display.
         next_oe <= '0';
 
-        next_ram_addr <= s_ram_addr(ADDR_WIDTH-1 downto 3) & "000";
+        next_addr <= addr(ADDR_WIDTH-1 downto 3) & "000";
 
         next_state <= read_pixel_data;
     end case;
   end process;
+
+  -- Data on the `led` input is loaded when the `load` signal is high on each rising edge of the `clk` signal.
+  process(rst, clk, load)
+  begin
+    if rst = '1' then
+      leds_in <= (others => '0');
+    elsif rising_edge(clk) and load = '1' then
+      leds_in <= leds_in(DISPLAY_WIDTH-2 downto 0) & led;
+    end if;
+  end process;
+
+  -- Latch the LEDs when the `lat` signal is high.
+  process(clk, lat)
+  begin
+    if rising_edge(clk) and lat = '1' then
+      leds_out <= leds_in;
+    end if;
+  end process;
+
+  -- Output the LEDs when the `oe` signal is low.
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if oe = '0' then
+        display_cols <= leds_out;
+      else
+        display_cols <= (others => '0');
+      end if;
+    end if;
+  end process;
+
+  with row select
+    display_rows <= "10000000" when "111",
+                    "01000000" when "110",
+                    "00100000" when "101",
+                    "00010000" when "100",
+                    "00001000" when "011",
+                    "00000100" when "010",
+                    "00000010" when "001",
+                    "00000001" when others;
 end arch;

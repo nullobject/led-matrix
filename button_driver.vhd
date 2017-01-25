@@ -11,15 +11,15 @@ entity button_driver is
     clk : in std_logic;
 
     -- Display IO
-    row_addr : in std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
+    row_addr : in std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
 
     -- Memory IO
     addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
     data : out std_logic_vector(DATA_WIDTH-1 downto 0);
     we   : out std_logic;
 
-    -- Matrix IO
-    buttons : in std_logic_vector(MATRIX_WIDTH-1 downto 0)
+    -- Display IO
+    buttons : in std_logic_vector(DISPLAY_WIDTH-1 downto 0)
   );
 end button_driver;
 

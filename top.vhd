@@ -9,10 +9,10 @@ entity charlie is
     rst_in : in std_logic;
     clk : in std_logic;
 
-    -- Matrix
-    rows    : out std_logic_vector(MATRIX_HEIGHT-1 downto 0);
-    leds    : out std_logic_vector(MATRIX_WIDTH-1 downto 0);
-    buttons : in  std_logic_vector(MATRIX_WIDTH-1 downto 0);
+    -- Display
+    rows    : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
+    cols    : out std_logic_vector(DISPLAY_WIDTH-1 downto 0);
+    buttons : in  std_logic_vector(DISPLAY_WIDTH-1 downto 0);
 
     -- -- I2C
     -- scl : in    std_logic;
@@ -32,12 +32,6 @@ architecture arch of charlie is
   signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0);
   signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
-
-  signal display_load     : std_logic;
-  signal display_led      : std_logic;
-  signal display_lat      : std_logic;
-  signal display_oe       : std_logic;
-  signal display_row_addr : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
 
   -- signal i2c_read_req         : std_logic;
   -- signal i2c_data_to_master   : std_logic_vector(7 downto 0);
@@ -75,28 +69,12 @@ begin
 
   display : entity work.display
     port map (
-      rst      => rst,
-      clk      => clk10,
-      load     => display_load,
-      led      => display_led,
-      lat      => display_lat,
-      oe       => display_oe,
-      row_addr => display_row_addr,
-      ram_addr => ram_addr_b,
-      ram_data => ram_dout_b
-    );
-
-  matrix_driver : entity work.matrix_driver
-    port map (
-      rst      => rst,
-      clk      => clk10,
-      load     => display_load,
-      led      => display_led,
-      lat      => display_lat,
-      oe       => display_oe,
-      row_addr => display_row_addr,
-      rows     => rows,
-      leds     => leds
+      rst          => rst,
+      clk          => clk10,
+      ram_addr     => ram_addr_b,
+      ram_data     => ram_dout_b,
+      display_rows => rows,
+      display_cols => cols
     );
 
   spi_slave : entity work.spi_slave

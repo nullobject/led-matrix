@@ -8,11 +8,11 @@ use ieee.math_real.all;
 -- This block applies gamma correction to the input value.
 entity gamma is
   generic (
-    -- The width of the colour value.
-    width : natural := 8;
-
     -- The gamma value.
-    gamma : real := 1.0
+    gamma : real := 1.0;
+
+    -- The width of the colour value.
+    width : natural := 8
   );
   port (
     clk       : in  std_logic;
