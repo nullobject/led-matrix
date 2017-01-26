@@ -6,54 +6,57 @@ use ieee.numeric_std.all;
 entity spi_slave is
   port (
     rst      : in  std_logic;
+    clk      : in  std_logic;
     spi_clk  : in  std_logic;
     spi_ss   : in  std_logic;
     spi_mosi : in  std_logic;
     spi_miso : out std_logic := '0';
     spi_done : out std_logic;
-    spi_ack  : in  std_logic;
     spi_rxd  : out std_logic_vector(7 downto 0)
   );
 end spi_slave;
 
 architecture arch of spi_slave is
   signal index: natural range 0 to 7;
-  signal spi_rxd_reg : std_logic_vector(6 downto 0);
+  signal din : std_logic_vector(7 downto 0);
+
+  signal spi_clk_reg, spi_ss_reg : std_logic_vector(2 downto 0);
+  signal spi_mosi_reg : std_logic_vector(1 downto 0);
+  signal spi_clk_rising_edge, spi_clk_falling_edge, spi_ss_rising_edge, spi_ss_falling_edge : std_logic;
 begin
-  process(rst, spi_clk, spi_ss, spi_mosi, spi_ack)
+  process(clk, rst, spi_clk)
   begin
     if rst = '1' then
       index <= 0;
-      spi_rxd_reg <= (others => '0');
+      din <= (others => '0');
       spi_done <= '0';
-    else
-      if spi_ack = '1' then
-        spi_done <= '0';
 
-        if rising_edge(spi_clk) then
-          if spi_ss = '0' then
-            index <= index + 1;
-            spi_rxd_reg <= spi_rxd_reg(5 downto 0) & spi_mosi;
-          end if;
-        end if;
-      else
-        if rising_edge(spi_clk) then
-          if spi_ss = '0' then
-            if index = 7 then
-              spi_rxd <= spi_rxd_reg(6 downto 0) & spi_mosi;
-              spi_done <= '1';
-              index <= 0;
-              spi_rxd_reg <= (others => '0');
-            else
-              index <= index + 1;
-              spi_rxd_reg <= spi_rxd_reg(5 downto 0) & spi_mosi;
-            end if;
-          else
-            index <= 0;
-            spi_rxd_reg <= (others => '0');
-          end if;
+      spi_clk_reg <= (others => '0');
+      spi_ss_reg  <= (others => '0');
+      spi_mosi_reg <= (others => '0');
+    elsif rising_edge(clk) then
+      spi_clk_reg <= spi_clk_reg(1 downto 0) & spi_clk;
+      spi_clk_rising_edge <= (not spi_clk_reg(2)) and spi_clk_reg(1);
+      spi_clk_falling_edge <= spi_clk_reg(2) and (not spi_clk_reg(1));
+
+      spi_ss_reg <= spi_ss_reg(1 downto 0) & spi_ss;
+      spi_ss_rising_edge <= (not spi_ss_reg(2)) and spi_ss_reg(1);
+      spi_ss_falling_edge <= spi_ss_reg(2) and (not spi_ss_reg(1));
+
+      spi_mosi_reg <= spi_mosi_reg(0) & spi_mosi;
+
+      spi_done <= '0';
+
+      if spi_clk_rising_edge = '1' then
+        index <= index + 1;
+        din <= din(6 downto 0) & spi_mosi_reg(1);
+      elsif spi_clk_falling_edge = '1' then
+        if index = 0 then
+          spi_done <= '1';
         end if;
       end if;
     end if;
   end process;
+
+  spi_rxd <= din;
 end arch;
