@@ -17,7 +17,7 @@ architecture arch of display_tb is
       led      : out std_logic;
       lat      : out std_logic;
       oe       : out std_logic;
-      row_addr : out std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
+      row_addr : out std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
       addr     : out std_logic_vector(ADDR_WIDTH-1 downto 0);
       data     : in std_logic_vector(DATA_WIDTH-1 downto 0)
     );
@@ -25,7 +25,7 @@ architecture arch of display_tb is
 
   signal rst, clk     : std_logic;
   signal load         : std_logic;
-  signal row_addr     : std_logic_vector(MATRIX_HEIGHT_LOG2-1 downto 0);
+  signal row_addr     : std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
   signal led, lat, oe : std_logic;
   signal addr         : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal data         : std_logic_vector(DATA_WIDTH-1 downto 0);
