@@ -81,9 +81,7 @@ begin
       spi_mosi => mosi,
       spi_miso => miso,
       spi_done => spi_done,
-      DataRxd => spi_rx_data,
-      DataToTxLoad => '0',
-      DataToTx => (others => '0')
+      spi_rxd => spi_rx_data
     );
 
   spi_handler : process(rst, clk50)
