@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 
 use work.automata.all;
 
--- This entity implements a display controller. It continuously refreshes the
+-- This block implements a display controller. It continuously refreshes the
 -- pixel data from RAM and converts it into display IO signals.
 entity display is
   port (

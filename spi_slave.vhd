@@ -3,6 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- This block implements an SPI slave controller. It was adapted from the
+-- fpga4fun site (https://fpga4fun.com/SPI2.html).
 entity spi_slave is
   port (
     rst      : in  std_logic;
@@ -17,7 +19,7 @@ entity spi_slave is
 end spi_slave;
 
 architecture arch of spi_slave is
-  signal index: natural range 0 to 7;
+  signal count: natural range 0 to 7;
   signal din : std_logic_vector(7 downto 0);
 
   signal spi_clk_reg, spi_ss_reg : std_logic_vector(2 downto 0);
@@ -27,7 +29,7 @@ begin
   process(clk, rst, spi_clk)
   begin
     if rst = '1' then
-      index <= 0;
+      count <= 0;
       din <= (others => '0');
       spi_done <= '0';
 
@@ -47,13 +49,17 @@ begin
 
       spi_done <= '0';
 
-      if spi_clk_rising_edge = '1' then
-        index <= index + 1;
-        din <= din(6 downto 0) & spi_mosi_reg(1);
-      elsif spi_clk_falling_edge = '1' then
-        if index = 0 then
-          spi_done <= '1';
+      if spi_ss_reg(1) = '0' then
+        if spi_clk_rising_edge = '1' then
+          count <= count + 1;
+          din <= din(6 downto 0) & spi_mosi_reg(1);
+        elsif spi_clk_falling_edge = '1' then
+          if count = 0 then
+            spi_done <= '1';
+          end if;
         end if;
+      else
+        count <= 0;
       end if;
     end if;
   end process;
