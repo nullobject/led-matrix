@@ -15,7 +15,6 @@ entity gamma is
     data_width : natural := 8
   );
   port (
-    clk      : in  std_logic;
     data_in  : in  std_logic_vector(data_width-1 downto 0);
     data_out : out std_logic_vector(data_width-1 downto 0)
   );
@@ -37,10 +36,5 @@ architecture arch of gamma is
 
   constant gamma_lut : lut_type := lut_init(data_width, gamma);
 begin
-  lut_proc : process(clk)
-  begin
-    if rising_edge(clk) then
-      data_out <= gamma_lut(conv_integer(data_in));
-    end if;
-  end process lut_proc;
+  data_out <= gamma_lut(conv_integer(data_in));
 end arch;

@@ -29,23 +29,23 @@ architecture arch of charlie is
   signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
 
-  type state_t is (idle_state, addr_state, data_state);
+  type state_t is (idle_state, data_state);
   signal state : state_t;
 
-  signal spi_rx_data  : std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal spi_done : std_logic;
+  signal spi_rx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal spi_done, spi_ack : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
   clock_generator : entity work.clock_generator
     port map (
-  		clkin_in        => clk,
+      clkin_in        => clk,
       rst_in          => rst_in,
-  		clkfx_out       => clk10,
-  		clkin_ibufg_out => open,
+      clkfx_out       => clk10,
+      clkin_ibufg_out => open,
       clk0_out        => clk50,
       locked_out      => locked
-  	);
+    );
 
   memory : entity work.memory
     generic map (
@@ -74,35 +74,39 @@ begin
 
   spi_slave : entity work.spi_slave
     port map (
-      reset => rst,
-      clk => clk10,
-      spi_ss => ss,
-      spi_clk => sck,
+      rst      => rst,
+      spi_ss   => ss,
+      spi_clk  => sck,
       spi_mosi => mosi,
       spi_miso => miso,
+      spi_rxd  => spi_rx_data,
       spi_done => spi_done,
-      spi_rxd => spi_rx_data
+      spi_ack  => spi_ack
     );
 
-  spi_handler : process(rst, clk50)
+  spi_handler : process(rst, clk50, spi_done)
   begin
     if rst = '1' then
       state <= idle_state;
     elsif rising_edge(clk50) then
       ram_we <= '0';
+      spi_ack <= '0';
+
       case state is
       when idle_state =>
         if spi_done = '1' then
+          ram_we <= '1';
           ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
+          spi_ack <= '1';
           state <= data_state;
         end if;
       when data_state =>
         if spi_done = '1' then
           ram_we <= '1';
           ram_din_a <= spi_rx_data;
+          spi_ack <= '1';
           state <= idle_state;
         end if;
-      when others =>
       end case;
     end if;
   end process;

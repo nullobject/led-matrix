@@ -47,7 +47,6 @@ begin
       data_width => DATA_WIDTH
     )
     port map (
-      clk      => clk,
       data_in  => ram_data,
       data_out => pixel
     );

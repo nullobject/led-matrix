@@ -3,7 +3,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- This block implements a dual-port asynchronous RAM.
+-- This block implements a clocked dual-port asynchronous RAM.
 entity memory is
   generic (
     addr_width : natural := 8;
