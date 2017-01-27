@@ -12,15 +12,16 @@ entity spi_slave is
     spi_clk  : in  std_logic;
     spi_ss   : in  std_logic;
     spi_mosi : in  std_logic;
-    spi_miso : out std_logic := '0';
+    spi_miso : out std_logic;
     spi_done : out std_logic;
-    spi_rxd  : out std_logic_vector(7 downto 0)
+    spi_rxd  : out std_logic_vector(7 downto 0);
+    spi_txd  : in  std_logic_vector(7 downto 0)
   );
 end spi_slave;
 
 architecture arch of spi_slave is
   signal count: natural range 0 to 7;
-  signal din : std_logic_vector(7 downto 0);
+  signal din, dout : std_logic_vector(7 downto 0);
 
   signal spi_clk_reg, spi_ss_reg : std_logic_vector(2 downto 0);
   signal spi_mosi_reg : std_logic_vector(1 downto 0);
@@ -32,6 +33,7 @@ begin
       count <= 0;
       din <= (others => '0');
       spi_done <= '0';
+      spi_miso <= 'Z';
 
       spi_clk_reg <= (others => '0');
       spi_ss_reg  <= (others => '0');
@@ -49,6 +51,17 @@ begin
 
       spi_done <= '0';
 
+      -- The first data bit is written on the SS falling edge and read on the first SCLK edge.
+      if spi_ss_falling_edge = '1' then
+        dout <= spi_txd;
+      elsif spi_ss_reg(1) = '0' and spi_clk_falling_edge = '1' then
+        if count = 0 then
+          dout <= spi_txd;
+        else
+          dout <= dout(6 downto 0) & '0';
+        end if;
+      end if;
+
       if spi_ss_reg(1) = '0' then
         if spi_clk_rising_edge = '1' then
           count <= count + 1;
@@ -64,5 +77,6 @@ begin
     end if;
   end process;
 
+  spi_miso <= dout(7);
   spi_rxd <= din;
 end arch;

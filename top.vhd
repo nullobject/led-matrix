@@ -25,16 +25,16 @@ entity charlie is
 end charlie;
 
 architecture arch of charlie is
-  signal ram_we     : std_logic;
-  signal ram_addr_a, next_ram_addr : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal ram_din_a  : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal ram_we : std_logic;
+  signal ram_addr_a, next_ram_addr_a : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal ram_din_a, ram_dout_a : std_logic_vector(DATA_WIDTH-1 downto 0);
   signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
 
   type state_t is (addr_state, data_state, inc_state);
   signal state : state_t;
 
-  signal spi_rx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal spi_rx_data, spi_tx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
   signal spi_done : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
@@ -60,7 +60,7 @@ begin
       we     => ram_we,
       addr_a => ram_addr_a,
       din_a  => ram_din_a,
-      dout_a => open,
+      dout_a => ram_dout_a,
       addr_b => ram_addr_b,
       dout_b => ram_dout_b
     );
@@ -84,7 +84,8 @@ begin
       spi_mosi => mosi,
       spi_miso => miso,
       spi_rxd  => spi_rx_data,
-      spi_done => spi_done
+      spi_done => spi_done,
+      spi_txd  => spi_tx_data
     );
 
   spi_handler : process(rst, clk50, spi_done)
@@ -107,13 +108,15 @@ begin
         when data_state =>
           if spi_done = '1' then
             ram_we <= '1';
-            next_ram_addr <= ram_addr_a + 1;
+            next_ram_addr_a <= ram_addr_a + 1;
             ram_din_a <= spi_rx_data;
             state <= inc_state;
+          else
+            spi_tx_data <= ram_dout_a;
           end if;
 
         when inc_state =>
-          ram_addr_a <= next_ram_addr;
+          ram_addr_a <= next_ram_addr_a;
           state <= data_state;
 
         end case;
