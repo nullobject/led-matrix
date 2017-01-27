@@ -55,7 +55,6 @@ begin
       data_width => DATA_WIDTH
     )
     port map (
-      rst    => rst,
       clk    => clk50,
       we     => ram_we,
       addr_a => ram_addr_a,

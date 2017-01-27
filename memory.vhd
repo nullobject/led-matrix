@@ -3,15 +3,16 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- This block implements a clocked dual-port asynchronous RAM. Port A is
--- read/write signals, port B is read-only.
+-- This block implements a dual-port synchronous BRAM. Port A is read/write
+-- signals, port B is read-only.
+--
+-- Adapted from the VHDL Prototyping By Examples book (p251).
 entity memory is
   generic (
     addr_width : natural := 8;
     data_width : natural := 8
   );
   port (
-    rst : in std_logic;
     clk : in std_logic;
     we  : in std_logic;
 
@@ -29,16 +30,20 @@ end memory;
 architecture arch of memory is
   type ram_type is array (0 to 2**addr_width-1) of std_logic_vector(data_width-1 downto 0);
   signal ram : ram_type;
+  signal addr_a_reg, addr_b_reg : std_logic_vector(addr_width-1 downto 0);
 begin
-  process(clk, we, addr_a, din_a)
+  process(clk)
   begin
-    if rst = '1' then
-      ram <= (others => (others => '0'));
-    elsif rising_edge(clk) and we = '1' then
-      ram(to_integer(unsigned(addr_a))) <= din_a;
+    if rising_edge(clk) then
+      if we = '1' then
+        ram(to_integer(unsigned(addr_a))) <= din_a;
+      end if;
+
+      addr_a_reg <= addr_a;
+      addr_b_reg <= addr_b;
     end if;
   end process;
 
-  dout_a <= ram(to_integer(unsigned(addr_a)));
-  dout_b <= ram(to_integer(unsigned(addr_b)));
+  dout_a <= ram(to_integer(unsigned(addr_a_reg)));
+  dout_b <= ram(to_integer(unsigned(addr_b_reg)));
 end arch;
