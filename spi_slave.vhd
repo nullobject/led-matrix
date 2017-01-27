@@ -7,8 +7,10 @@ use ieee.numeric_std.all;
 -- fpga4fun site (https://fpga4fun.com/SPI2.html).
 entity spi_slave is
   port (
-    rst      : in  std_logic;
-    clk      : in  std_logic;
+    rst : in std_logic;
+    clk : in std_logic;
+
+    -- SPI IO
     spi_clk  : in  std_logic;
     spi_ss   : in  std_logic;
     spi_mosi : in  std_logic;
@@ -51,24 +53,20 @@ begin
 
       spi_done <= '0';
 
-      -- The first data bit is written on the SS falling edge and read on the first SCLK edge.
       if spi_ss_falling_edge = '1' then
+        -- The first output bit is written on the SS falling edge.
         dout <= spi_txd;
-      elsif spi_ss_reg(1) = '0' and spi_clk_falling_edge = '1' then
-        if count = 0 then
-          dout <= spi_txd;
-        else
-          dout <= dout(6 downto 0) & '0';
-        end if;
-      end if;
-
-      if spi_ss_reg(1) = '0' then
+      elsif spi_ss_reg(1) = '0' then
         if spi_clk_rising_edge = '1' then
-          count <= count + 1;
+          -- The input is read on the clock rising edge.
           din <= din(6 downto 0) & spi_mosi_reg(1);
+          count <= count + 1;
         elsif spi_clk_falling_edge = '1' then
           if count = 0 then
             spi_done <= '1';
+            dout <= spi_txd;
+          else
+            dout <= dout(6 downto 0) & '0';
           end if;
         end if;
       else

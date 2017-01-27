@@ -1,8 +1,6 @@
 library ieee;
 
 use ieee.std_logic_1164.all;
-use ieee.std_logic_arith.all;
-use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 use work.automata.all;
 
@@ -107,7 +105,7 @@ begin
         when data_state =>
           if spi_done = '1' then
             ram_we <= '1';
-            next_ram_addr_a <= ram_addr_a + 1;
+            next_ram_addr_a <= std_logic_vector(unsigned(ram_addr_a) + 1);
             ram_din_a <= spi_rx_data;
             state <= inc_state;
           else
