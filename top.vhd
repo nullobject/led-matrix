@@ -60,6 +60,7 @@ begin
       we     => ram_we,
       addr_a => ram_addr_a,
       din_a  => ram_din_a,
+      dout_a => open,
       addr_b => ram_addr_b,
       dout_b => ram_dout_b
     );

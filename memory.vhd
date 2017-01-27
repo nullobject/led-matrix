@@ -3,7 +3,8 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- This block implements a clocked dual-port asynchronous RAM.
+-- This block implements a clocked dual-port asynchronous RAM. Port A is
+-- read/write signals, port B is read-only.
 entity memory is
   generic (
     addr_width : natural := 8;
@@ -14,11 +15,12 @@ entity memory is
     clk : in std_logic;
     we  : in std_logic;
 
-    -- Input
-    addr_a : in std_logic_vector(addr_width-1 downto 0);
-    din_a  : in std_logic_vector(data_width-1 downto 0);
+    -- Port A
+    addr_a : in  std_logic_vector(addr_width-1 downto 0);
+    din_a  : in  std_logic_vector(data_width-1 downto 0);
+    dout_a : out std_logic_vector(data_width-1 downto 0);
 
-    -- Output
+    -- Port B
     addr_b : in  std_logic_vector(addr_width-1 downto 0);
     dout_b : out std_logic_vector(data_width-1 downto 0)
   );
@@ -37,5 +39,6 @@ begin
     end if;
   end process;
 
+  dout_a <= ram(to_integer(unsigned(addr_a)));
   dout_b <= ram(to_integer(unsigned(addr_b)));
 end arch;
