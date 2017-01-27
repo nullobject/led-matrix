@@ -29,13 +29,13 @@ architecture arch of spi_slave is
   signal spi_mosi_reg : std_logic_vector(1 downto 0);
   signal spi_clk_rising_edge, spi_clk_falling_edge, spi_ss_rising_edge, spi_ss_falling_edge : std_logic;
 begin
-  process(clk, rst, spi_clk)
+  process(clk, rst, spi_clk, spi_ss)
   begin
     if rst = '1' then
-      count <= 0;
-      din <= (others => '0');
-      spi_done <= '0';
-      spi_miso <= 'Z';
+      -- count <= 0;
+      -- din <= (others => '0');
+      -- spi_done <= '0';
+      -- spi_miso <= 'Z';
 
       spi_clk_reg <= (others => '0');
       spi_ss_reg  <= (others => '0');
@@ -50,27 +50,51 @@ begin
       spi_ss_falling_edge <= spi_ss_reg(2) and (not spi_ss_reg(1));
 
       spi_mosi_reg <= spi_mosi_reg(0) & spi_mosi;
+    end if;
+  end process;
 
-      spi_done <= '0';
-
-      if spi_ss_falling_edge = '1' then
-        -- The first output bit is written on the SS falling edge.
-        dout <= spi_txd;
-      elsif spi_ss_reg(1) = '0' then
+  counter: process(clk)
+  begin
+    if rising_edge(clk) then
+      if spi_ss_reg(1) = '0' then
         if spi_clk_rising_edge = '1' then
-          -- The input is read on the clock rising edge.
-          din <= din(6 downto 0) & spi_mosi_reg(1);
           count <= count + 1;
-        elsif spi_clk_falling_edge = '1' then
-          if count = 0 then
-            spi_done <= '1';
-            dout <= spi_txd;
-          else
-            dout <= dout(6 downto 0) & '0';
-          end if;
         end if;
       else
         count <= 0;
+      end if;
+    end if;
+  end process;
+
+  -- The input is read on the clock rising edge.
+  rx: process(clk)
+  begin
+    if rising_edge(clk) then
+      spi_done <= '0';
+
+      if spi_ss_reg(1) = '0' and spi_clk_rising_edge = '1' then
+        din <= din(6 downto 0) & spi_mosi_reg(1);
+      elsif spi_clk_falling_edge = '1' then
+        if count = 0 then
+          spi_done <= '1';
+        end if;
+      end if;
+    end if;
+  end process;
+
+  -- The first output bit is written on the SS falling edge.
+  -- FIXME: WTF is this causing timing issues?
+  tx: process(clk)
+  begin
+    if rising_edge(clk) then
+      if spi_ss_falling_edge = '1' then
+        dout <= spi_txd;
+      elsif spi_ss_reg(1) = '0' and spi_clk_falling_edge = '1' then
+        if count = 0 then
+          dout <= spi_txd;
+        else
+          dout <= dout(6 downto 0) & '0';
+        end if;
       end if;
     end if;
   end process;
