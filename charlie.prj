@@ -1,5 +1,4 @@
 vhdl work "debounce.vhd"
-vhdl work "config.vhd"
 vhdl work "gamma.vhd"
 vhdl work "memory.vhd"
 vhdl work "spi_slave.vhd"

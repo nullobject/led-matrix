@@ -2,7 +2,6 @@ library ieee;
 
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.automata.all;
 
 entity charlie is
   port (
@@ -10,24 +9,28 @@ entity charlie is
     clk : in std_logic;
 
     -- Display IO
-    rows    : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
-    cols    : out std_logic_vector(DISPLAY_WIDTH-1 downto 0);
-    buttons : in  std_logic_vector(DISPLAY_WIDTH-1 downto 0);
+    rows    : out std_logic_vector(7 downto 0);
+    cols    : out std_logic_vector(7 downto 0);
+    buttons : in  std_logic_vector(7 downto 0);
 
     -- SPI IO
-    ss   : in std_logic;
-    sck  : in std_logic;
-    mosi : in std_logic;
+    ss   : in  std_logic;
+    sck  : in  std_logic;
+    mosi : in  std_logic;
     miso : out std_logic
   );
 end charlie;
 
 architecture arch of charlie is
+  constant DATA_WIDTH : natural := 8;
+  constant ADDR_WIDTH : natural := 6;
+
+  constant DISPLAY_WIDTH  : natural := 8;
+  constant DISPLAY_HEIGHT : natural := 8;
+
   signal ram_we : std_logic;
-  signal ram_addr_a, next_ram_addr_a : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal ram_din_a, ram_dout_a : std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal ram_addr_a, next_ram_addr_a, ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
+  signal ram_din_a, ram_dout_a, ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
 
   type state_t is (addr_state, data_state, inc_state);
   signal state : state_t;
@@ -63,6 +66,12 @@ begin
     );
 
   display : entity work.display
+    generic map (
+      addr_width     => ADDR_WIDTH,
+      data_width     => DATA_WIDTH,
+      display_width  => DISPLAY_WIDTH,
+      display_height => DISPLAY_HEIGHT
+    )
     port map (
       rst          => rst,
       clk          => clk10,
@@ -104,7 +113,10 @@ begin
 
         when data_state =>
           if spi_done = '1' then
-            ram_we <= '1';
+            if to_integer(unsigned(ram_addr_a)) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+              -- Only allow writing to the display buffer (0-40h).
+              ram_we <= '1';
+            end if;
             next_ram_addr_a <= std_logic_vector(unsigned(ram_addr_a) + 1);
             ram_din_a <= spi_rx_data;
             state <= inc_state;
