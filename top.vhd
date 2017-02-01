@@ -17,7 +17,9 @@ entity charlie is
     ss   : in  std_logic;
     sck  : in  std_logic;
     mosi : in  std_logic;
-    miso : out std_logic
+    miso : out std_logic;
+
+    debug : out std_logic_vector(3 downto 0)
   );
 end charlie;
 
@@ -37,6 +39,8 @@ architecture arch of charlie is
 
   signal spi_rx_data, spi_tx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
   signal spi_done : std_logic;
+  signal spi_done_reg : std_logic_vector(1 downto 0);
+  signal spi_done_rising_edge : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
@@ -82,37 +86,45 @@ begin
     );
 
   spi_slave : entity work.spi_slave
+    generic map (
+      N => DATA_WIDTH
+    )
     port map (
-      rst      => rst,
-      clk      => clk50,
-      spi_ss   => ss,
-      spi_clk  => sck,
-      spi_mosi => mosi,
-      spi_miso => miso,
-      spi_rxd  => spi_rx_data,
-      spi_done => spi_done,
-      spi_txd  => spi_tx_data
+      clk_i => clk50,
+      spi_ssel_i => ss,
+      spi_sck_i  => sck,
+      spi_mosi_i => mosi,
+      spi_miso_o => miso,
+      di_req_o => open,
+      di_i => spi_tx_data,
+      wren_i => open,
+      wr_ack_o => open,
+      do_valid_o => spi_done,
+      do_o => spi_rx_data,
+      state_dbg_o => debug
     );
 
-  spi_handler : process(rst, clk50, spi_done)
+  spi_handler : process(rst, clk50)
   begin
     if rst = '1' then
       state <= addr_state;
     elsif rising_edge(clk50) then
       ram_we <= '0';
+      spi_done_reg <= spi_done_reg(0) & spi_done;
+      spi_done_rising_edge <= (not spi_done_reg(1)) and spi_done_reg(0);
 
       if ss = '1' then
         state <= addr_state;
       else
         case state is
         when addr_state =>
-          if spi_done = '1' then
+          if spi_done_rising_edge = '1' then
             ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
             state <= data_state;
           end if;
 
         when data_state =>
-          if spi_done = '1' then
+          if spi_done_rising_edge = '1' then
             if to_integer(unsigned(ram_addr_a)) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
               -- Only allow writing to the display buffer (0-40h).
               ram_we <= '1';
