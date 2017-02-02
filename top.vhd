@@ -38,9 +38,9 @@ architecture arch of charlie is
   signal state : state_t;
 
   signal spi_rx_data, spi_tx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal spi_done : std_logic;
-  signal spi_done_reg : std_logic_vector(1 downto 0);
-  signal spi_done_rising_edge : std_logic;
+  signal spi_done, spi_req, spi_wren, spi_wr_ack : std_logic;
+  signal spi_done_reg, spi_req_reg : std_logic_vector(1 downto 0);
+  signal spi_done_rising_edge, spi_req_rising_edge : std_logic;
 
   signal clk10, clk50, locked, rst : std_logic;
 begin
@@ -95,12 +95,12 @@ begin
       spi_sck_i  => sck,
       spi_mosi_i => mosi,
       spi_miso_o => miso,
-      di_req_o => open,
-      di_i => spi_tx_data,
-      wren_i => open,
-      wr_ack_o => open,
-      do_valid_o => spi_done,
       do_o => spi_rx_data,
+      do_valid_o => spi_done,
+      di_i => spi_tx_data,
+      di_req_o => spi_req,
+      wren_i => spi_wren,
+      wr_ack_o => spi_wr_ack,
       state_dbg_o => debug
     );
 
@@ -112,6 +112,8 @@ begin
       ram_we <= '0';
       spi_done_reg <= spi_done_reg(0) & spi_done;
       spi_done_rising_edge <= (not spi_done_reg(1)) and spi_done_reg(0);
+      spi_req_reg <= spi_req_reg(0) & spi_req;
+      spi_req_rising_edge <= (not spi_req_reg(1)) and spi_req_reg(0);
 
       if ss = '1' then
         state <= addr_state;
@@ -124,6 +126,13 @@ begin
           end if;
 
         when data_state =>
+          if spi_req_rising_edge = '1' then
+            spi_tx_data <= ram_dout_a;
+            spi_wren <= '1';
+          elsif spi_wr_ack = '1' then
+            spi_wren <= '0';
+          end if;
+
           if spi_done_rising_edge = '1' then
             if to_integer(unsigned(ram_addr_a)) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
               -- Only allow writing to the display buffer (0-40h).
@@ -132,8 +141,6 @@ begin
             next_ram_addr_a <= std_logic_vector(unsigned(ram_addr_a) + 1);
             ram_din_a <= spi_rx_data;
             state <= inc_state;
-          else
-            spi_tx_data <= ram_dout_a;
           end if;
 
         when inc_state =>
