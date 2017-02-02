@@ -30,15 +30,16 @@ architecture arch of charlie is
   constant DISPLAY_WIDTH  : natural := 8;
   constant DISPLAY_HEIGHT : natural := 8;
 
-  signal ram_we : std_logic;
+  signal ram_we, next_ram_we : std_logic;
   signal ram_addr_a, next_ram_addr_a, ram_addr_b : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal ram_din_a, ram_dout_a, ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : std_logic_vector(DATA_WIDTH-1 downto 0);
 
-  type state_t is (addr_state, data_state, inc_state);
-  signal state : state_t;
+  type state_t is (addr_state, data_state, lol_state, inc_state);
+  signal state, next_state : state_t;
 
-  signal spi_rx_data, spi_tx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal spi_done, spi_req, spi_wren, spi_wr_ack : std_logic;
+  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(DATA_WIDTH-1 downto 0);
+  signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
+
   signal spi_done_reg, spi_req_reg : std_logic_vector(1 downto 0);
   signal spi_done_rising_edge, spi_req_rising_edge : std_logic;
 
@@ -104,51 +105,70 @@ begin
       state_dbg_o => debug
     );
 
-  spi_handler : process(rst, clk50)
+  spi_fsm_proc : process(state, ss, spi_done_rising_edge, ram_addr_a, ram_din_a, spi_tx_data)
   begin
-    if rst = '1' then
-      state <= addr_state;
-    elsif rising_edge(clk50) then
-      ram_we <= '0';
-      spi_done_reg <= spi_done_reg(0) & spi_done;
-      spi_done_rising_edge <= (not spi_done_reg(1)) and spi_done_reg(0);
-      spi_req_reg <= spi_req_reg(0) & spi_req;
-      spi_req_rising_edge <= (not spi_req_reg(1)) and spi_req_reg(0);
+    next_state <= state;
+    next_ram_addr_a <= ram_addr_a;
+    next_ram_din_a <= ram_din_a;
+    next_ram_we <= '0';
+    next_spi_wren <= '0';
+    next_spi_tx_data <= spi_tx_data;
 
-      if ss = '1' then
-        state <= addr_state;
-      else
-        case state is
+    if ss = '1' then
+      next_state <= addr_state;
+      next_ram_we <= '0';
+    else
+      case state is
         when addr_state =>
           if spi_done_rising_edge = '1' then
-            ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
-            state <= data_state;
+            next_ram_addr_a <= spi_rx_data(ADDR_WIDTH-1 downto 0);
+            next_state <= data_state;
           end if;
 
         when data_state =>
           if spi_req_rising_edge = '1' then
-            spi_tx_data <= ram_dout_a;
-            spi_wren <= '1';
-          elsif spi_wr_ack = '1' then
-            spi_wren <= '0';
+            next_spi_tx_data <= ram_dout_a;
+            next_state <= lol_state;
           end if;
 
           if spi_done_rising_edge = '1' then
             if to_integer(unsigned(ram_addr_a)) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
               -- Only allow writing to the display buffer (0-40h).
-              ram_we <= '1';
+              next_ram_we <= '1';
             end if;
-            next_ram_addr_a <= std_logic_vector(unsigned(ram_addr_a) + 1);
-            ram_din_a <= spi_rx_data;
-            state <= inc_state;
+            next_ram_din_a <= spi_rx_data;
+            next_state <= inc_state;
           end if;
 
-        when inc_state =>
-          ram_addr_a <= next_ram_addr_a;
-          state <= data_state;
+        when lol_state =>
+          next_spi_wren <= '1';
+          next_state <= data_state;
 
-        end case;
-      end if;
+        when inc_state =>
+          next_ram_addr_a <= std_logic_vector(unsigned(ram_addr_a) + 1);
+          next_ram_we <= '0';
+          next_state <= data_state;
+      end case;
+    end if;
+  end process;
+
+  spi_handler : process(rst, clk50)
+  begin
+    if rst = '1' then
+      state <= addr_state;
+    elsif rising_edge(clk50) then
+      state <= next_state;
+      ram_we <= next_ram_we;
+      ram_din_a <= next_ram_din_a;
+      ram_addr_a <= next_ram_addr_a;
+      spi_tx_data <= next_spi_tx_data;
+      spi_wren <= next_spi_wren;
+
+      spi_done_reg <= spi_done_reg(0) & spi_done;
+      spi_done_rising_edge <= (not spi_done_reg(1)) and spi_done_reg(0);
+
+      spi_req_reg <= spi_req_reg(0) & spi_req;
+      spi_req_rising_edge <= (not spi_req_reg(1)) and spi_req_reg(0);
     end if;
   end process;
 
