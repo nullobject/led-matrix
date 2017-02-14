@@ -9,28 +9,28 @@ use ieee.numeric_std.all;
 -- Adapted from the VHDL Prototyping By Examples book (p251).
 entity memory is
   generic (
-    addr_width : natural := 8;
-    data_width : natural := 8
+    ADDR_WIDTH : natural := 8;
+    DATA_WIDTH : natural := 8
   );
   port (
     clk : in std_logic;
     we  : in std_logic;
 
     -- Port A
-    addr_a : in  std_logic_vector(addr_width-1 downto 0);
-    din_a  : in  std_logic_vector(data_width-1 downto 0);
-    dout_a : out std_logic_vector(data_width-1 downto 0);
+    addr_a : in  std_logic_vector(ADDR_WIDTH-1 downto 0);
+    din_a  : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+    dout_a : out std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Port B
-    addr_b : in  std_logic_vector(addr_width-1 downto 0);
-    dout_b : out std_logic_vector(data_width-1 downto 0)
+    addr_b : in  std_logic_vector(ADDR_WIDTH-1 downto 0);
+    dout_b : out std_logic_vector(DATA_WIDTH-1 downto 0)
   );
 end memory;
 
 architecture arch of memory is
-  type ram_type is array (0 to 2**addr_width-1) of std_logic_vector(data_width-1 downto 0);
+  type ram_type is array (0 to 2**ADDR_WIDTH-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
   signal ram : ram_type;
-  signal addr_a_reg, addr_b_reg : std_logic_vector(addr_width-1 downto 0);
+  signal addr_a_reg, addr_b_reg : std_logic_vector(ADDR_WIDTH-1 downto 0);
 begin
   process(clk)
   begin

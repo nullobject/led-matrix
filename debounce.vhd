@@ -6,11 +6,11 @@ use ieee.std_logic_misc.all;
 
 -- This entity implements a debouncing circuit.
 --
--- The input signal is sampled every clock tick. If the last `debounce_length`
+-- The input signal is sampled every clock tick. If the last `DEBOUNCE_LENGTH`
 -- consecutive input values are the same, then an output signal is produced.
 entity debounce is
   generic (
-    debounce_length : natural := 4
+    DEBOUNCE_LENGTH : natural := 4
   );
   port (
     clk  : in std_logic;
@@ -21,7 +21,7 @@ entity debounce is
 end debounce;
 
 architecture arch of debounce is
-  signal pipeline : std_logic_vector(debounce_length-1 downto 0) := (others => '0');
+  signal pipeline : std_logic_vector(DEBOUNCE_LENGTH-1 downto 0) := (others => '0');
 begin
   process(clk, rst, din) is
   begin

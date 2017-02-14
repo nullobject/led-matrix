@@ -9,19 +9,19 @@ use ieee.math_real.all;
 entity gamma is
   generic (
     -- The gamma value.
-    gamma : real := 1.0;
+    GAMMA : real := 1.0;
 
     -- The width of the colour value.
-    data_width : natural := 8
+    DATA_WIDTH : natural := 8
   );
   port (
-    data_in  : in  std_logic_vector(data_width-1 downto 0);
-    data_out : out std_logic_vector(data_width-1 downto 0)
+    data_in  : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+    data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
   );
 end gamma;
 
 architecture arch of gamma is
-  type lut_type is array(2**data_width-1 downto 0) of std_logic_vector(data_width-1 downto 0);
+  type lut_type is array(2**DATA_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
 
   function lut_init(c : integer; g : real) return lut_type is
     variable lut_var     : lut_type;
@@ -34,7 +34,7 @@ architecture arch of gamma is
     return lut_var;
   end lut_init;
 
-  constant gamma_lut : lut_type := lut_init(data_width, gamma);
+  constant gamma_lut : lut_type := lut_init(DATA_WIDTH, GAMMA);
 begin
   data_out <= gamma_lut(conv_integer(data_in));
 end arch;

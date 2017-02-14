@@ -57,8 +57,8 @@ begin
 
   memory : entity work.memory
     generic map (
-      addr_width => ADDR_WIDTH,
-      data_width => DATA_WIDTH
+      ADDR_WIDTH => ADDR_WIDTH,
+      DATA_WIDTH => DATA_WIDTH
     )
     port map (
       clk    => clk50,
@@ -72,10 +72,10 @@ begin
 
   display : entity work.display
     generic map (
-      addr_width     => ADDR_WIDTH,
-      data_width     => DATA_WIDTH,
-      display_width  => DISPLAY_WIDTH,
-      display_height => DISPLAY_HEIGHT
+      ADDR_WIDTH     => ADDR_WIDTH,
+      DATA_WIDTH     => DATA_WIDTH,
+      DISPLAY_WIDTH  => DISPLAY_WIDTH,
+      DISPLAY_HEIGHT => DISPLAY_HEIGHT
     )
     port map (
       rst          => rst,

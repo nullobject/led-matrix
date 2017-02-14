@@ -8,28 +8,28 @@ use ieee.numeric_std.all;
 -- pixel data from RAM and converts it into display IO signals.
 entity display is
   generic (
-    addr_width     : natural := 6;
-    data_width     : natural := 8;
-    display_width  : natural := 8;
-    display_height : natural := 8
+    ADDR_WIDTH     : natural := 6;
+    DATA_WIDTH     : natural := 8;
+    DISPLAY_WIDTH  : natural := 8;
+    DISPLAY_HEIGHT : natural := 8
   );
   port (
     rst : in std_logic;
     clk : in std_logic;
 
     -- Memory IO
-    ram_addr : out std_logic_vector(addr_width-1 downto 0);
-    ram_data : in  std_logic_vector(data_width-1 downto 0);
+    ram_addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
+    ram_data : in  std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Display IO
-    display_rows : out std_logic_vector(display_height-1 downto 0);
-    display_cols : out std_logic_vector(display_width-1 downto 0)
+    display_rows : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
+    display_cols : out std_logic_vector(DISPLAY_WIDTH-1 downto 0)
   );
 end display;
 
 architecture arch of display is
-  constant DISPLAY_HEIGHT_LOG2 : natural := natural(log2(real(display_height)));
-  constant DISPLAY_WIDTH_LOG2  : natural := natural(log2(real(display_width)));
+  constant DISPLAY_HEIGHT_LOG2 : natural := natural(log2(real(DISPLAY_HEIGHT)));
+  constant DISPLAY_WIDTH_LOG2  : natural := natural(log2(real(DISPLAY_WIDTH)));
 
   -- The current pixel value.
   signal pixel : std_logic_vector(7 downto 0);
@@ -39,20 +39,20 @@ architecture arch of display is
   signal state, next_state : state_type;
 
   -- State machine signals
-  signal bpp_count, next_bpp_count : unsigned(data_width-1 downto 0);
+  signal bpp_count, next_bpp_count : unsigned(DATA_WIDTH-1 downto 0);
   signal row, next_row             : std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
-  signal addr, next_addr           : std_logic_vector(addr_width-1 downto 0);
+  signal addr, next_addr           : std_logic_vector(ADDR_WIDTH-1 downto 0);
   signal led, next_led             : std_logic;
   signal oe, next_oe               : std_logic;
   signal inc_row, next_inc_row     : std_logic;
   signal load, lat                 : std_logic;
 
-  signal leds_in, leds_out : std_logic_vector(display_width-1 downto 0);
+  signal leds_in, leds_out : std_logic_vector(DISPLAY_WIDTH-1 downto 0);
 begin
   gamma : entity work.gamma
     generic map (
       gamma      => 2.8,
-      data_width => data_width
+      DATA_WIDTH => DATA_WIDTH
     )
     port map (
       data_in  => ram_data,
@@ -116,7 +116,7 @@ begin
             next_inc_row <= '0';
             next_oe <= '1';
             next_state <= incr_row_addr;
-          elsif bpp_count = unsigned(to_signed(-1, data_width)) then
+          elsif bpp_count = unsigned(to_signed(-1, DATA_WIDTH)) then
             next_addr <= std_logic_vector(unsigned(addr) + 1);
             next_inc_row <= '1';
             next_state <= latch;
@@ -142,7 +142,7 @@ begin
         -- Enable the display.
         next_oe <= '0';
 
-        next_addr <= addr(addr_width-1 downto 3) & "000";
+        next_addr <= addr(ADDR_WIDTH-1 downto 3) & "000";
 
         next_state <= read_pixel_data;
     end case;
@@ -154,7 +154,7 @@ begin
     if rst = '1' then
       leds_in <= (others => '0');
     elsif rising_edge(clk) and load = '1' then
-      leds_in <= leds_in(display_width-2 downto 0) & led;
+      leds_in <= leds_in(DISPLAY_WIDTH-2 downto 0) & led;
     end if;
   end process;
 
