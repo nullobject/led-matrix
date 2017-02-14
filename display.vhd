@@ -149,20 +149,24 @@ begin
   end process;
 
   -- Data on the `led` input is loaded when the `load` signal is high on each rising edge of the `clk` signal.
-  process(rst, clk, load)
+  process(rst, clk)
   begin
     if rst = '1' then
       leds_in <= (others => '0');
-    elsif rising_edge(clk) and load = '1' then
-      leds_in <= leds_in(DISPLAY_WIDTH-2 downto 0) & led;
+    elsif rising_edge(clk) then
+      if load = '1' then
+        leds_in <= leds_in(DISPLAY_WIDTH-2 downto 0) & led;
+      end if;
     end if;
   end process;
 
   -- Latch the LEDs when the `lat` signal is high.
-  process(clk, lat)
+  process(clk)
   begin
-    if rising_edge(clk) and lat = '1' then
-      leds_out <= leds_in;
+    if rising_edge(clk) then
+      if lat = '1' then
+        leds_out <= leds_in;
+      end if;
     end if;
   end process;
 

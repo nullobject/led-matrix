@@ -4,7 +4,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_misc.all;
 
--- This entity implements a debouncing circuit.
+-- This block implements a debouncing circuit.
 --
 -- The input signal is sampled every clock tick. If the last `DEBOUNCE_LENGTH`
 -- consecutive input values are the same, then an output signal is produced.
@@ -23,7 +23,7 @@ end debounce;
 architecture arch of debounce is
   signal pipeline : std_logic_vector(DEBOUNCE_LENGTH-1 downto 0) := (others => '0');
 begin
-  process(clk, rst, din) is
+  process(clk, rst) is
   begin
     if rst = '1' then
       pipeline <= (others => '0');
