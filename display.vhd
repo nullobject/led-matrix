@@ -35,7 +35,7 @@ architecture arch of display is
   -- correction to finish outputting their data.
   constant WAIT_MAX: integer := 1;
 
-  type state_type is (INIT_STATE, LOAD_STATE, ADDR_STATE, WAIT_STATE, LATCH_STATE);
+  type state_type is (RESET_STATE, LOAD_STATE, ADDR_STATE, WAIT_STATE, LATCH_STATE);
   signal state, next_state: state_type;
 
   -- Flags
@@ -122,7 +122,7 @@ begin
   main_proc: process(rst, clk)
   begin
     if rst = '1' then
-      state <= INIT_STATE;
+      state <= RESET_STATE;
       row_addr <= (others => '0');
       shift_reg <= (others => '0');
       cols_reg <= (others => '0');
@@ -161,8 +161,8 @@ begin
     row_inc    <= '0';
 
     case state is
-    -- The initial state where no outputs are enabled.
-    when INIT_STATE =>
+    -- Reset the state machine.
+    when RESET_STATE =>
       next_state <= LOAD_STATE;
 
     -- Load the LED bit into the shift register.
