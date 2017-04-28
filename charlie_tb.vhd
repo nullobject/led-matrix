@@ -3,8 +3,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.automata.all;
-
 entity charlie_tb is
 end entity;
 
@@ -23,7 +21,7 @@ architecture arch of charlie_tb is
     );
   end component;
 
-  component matrix_driver is
+  component matrix is
     port (
       rst      : in std_logic;
       clk      : in std_logic;
@@ -61,7 +59,7 @@ begin
     data     => data
   );
 
-  matrix_driver_uut : matrix_driver port map (
+  matrix_uut : matrix port map (
     rst      => rst,
     clk      => clk,
     load     => load,
