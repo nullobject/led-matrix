@@ -4,7 +4,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 -- This block implements a display controller. It continuously refreshes the
--- display data from RAM and converts it into row/column signals.
+-- display data from memory and converts it into row/column signals.
 --
 -- The rows are refreshed from top to bottom. The leds in each row are
 -- pulse-width modulated.
@@ -74,34 +74,17 @@ begin
       data_out => gamma_data
     );
 
-  -- The main process that updates the internal registers for the display.
-  main_proc: process(rst, clk)
+  -- Increments the wait counter.
+  wait_proc: process(clk)
   begin
-    if rst = '1' then
-      state <= INIT_STATE;
-      row_addr <= (others => '0');
-      shift_reg <= (others => '0');
-      cols_reg <= (others => '0');
-    elsif rising_edge(clk) then
-      -- Update the current state.
-      state <= next_state;
-
-      -- Reset the row address when latching a new row.
-      if latch = '1' and oe = '1' then
-        row_addr <= address_ctr(ADDR_WIDTH-1 downto ADDR_WIDTH-3);
-      end if;
-
-      -- Load display data into the column register.
-      if load = '1' then
-        shift_reg <= shift_reg(DISPLAY_WIDTH-2 downto 0) & led;
-      end if;
-
-      -- Latch the column register.
-      if latch = '1' then
-        cols_reg <= shift_reg;
+    if rising_edge(clk) then
+      if wait_en = '0' then
+        wait_ctr <= (others => '0');
+      else
+        wait_ctr <= wait_ctr + 1;
       end if;
     end if;
-  end process main_proc;
+  end process wait_proc;
 
   -- Updates the PWM counter.
   pwm_proc: process(rst, clk)
@@ -135,17 +118,34 @@ begin
     end if;
   end process addr_proc;
 
-  -- Increments the wait counter.
-  wait_proc: process(clk)
+  -- The main process that updates the internal registers for the display.
+  main_proc: process(rst, clk)
   begin
-    if rising_edge(clk) then
-      if wait_en = '0' then
-        wait_ctr <= (others => '0');
-      else
-        wait_ctr <= wait_ctr + 1;
+    if rst = '1' then
+      state <= INIT_STATE;
+      row_addr <= (others => '0');
+      shift_reg <= (others => '0');
+      cols_reg <= (others => '0');
+    elsif rising_edge(clk) then
+      -- Update the current state.
+      state <= next_state;
+
+      -- Reset the row address when latching a new row.
+      if latch = '1' and oe = '1' then
+        row_addr <= address_ctr(ADDR_WIDTH-1 downto ADDR_WIDTH-3);
+      end if;
+
+      -- Load display data into the column register.
+      if load = '1' then
+        shift_reg <= shift_reg(DISPLAY_WIDTH-2 downto 0) & led;
+      end if;
+
+      -- Latch the column register.
+      if latch = '1' then
+        cols_reg <= shift_reg;
       end if;
     end if;
-  end process wait_proc;
+  end process main_proc;
 
   -- The combinatorial process for the state machine.
   comb_proc: process(state, address_ctr, pwm_ctr, wait_ctr, oe) is
