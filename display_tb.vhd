@@ -3,70 +3,80 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.automata.all;
-
 entity display_tb is
 end entity;
 
 architecture arch of display_tb is
   component display is
     port (
-      rst      : in std_logic;
-      clk      : in std_logic;
-      load     : out std_logic;
-      led      : out std_logic;
-      lat      : out std_logic;
-      oe       : out std_logic;
-      row_addr : out std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
-      addr     : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-      data     : in std_logic_vector(DATA_WIDTH-1 downto 0)
+      rst: in std_logic;
+      clk: in std_logic;
+
+      ram_addr: out unsigned(5 downto 0);
+      ram_data: in unsigned(7 downto 0);
+
+      matrix_rows: out unsigned(7 downto 0);
+      matrix_cols: out unsigned(7 downto 0)
     );
   end component;
 
-  signal rst, clk     : std_logic;
-  signal load         : std_logic;
-  signal row_addr     : std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
-  signal led, lat, oe : std_logic;
-  signal addr         : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal data         : std_logic_vector(DATA_WIDTH-1 downto 0);
+  constant CLK_PERIOD: time := 20 ns; -- for a 50MHz clock
 
-  constant clk_period : time := 20 ns; -- for a 50MHz clock
+  signal rst, clk: std_logic;
+
+  signal ram_addr: unsigned(5 downto 0);
+  signal ram_data: unsigned(7 downto 0);
+
+  signal matrix_rows: unsigned(7 downto 0) := (others => '0');
+  signal matrix_cols: unsigned(7 downto 0) := (others => '0');
 begin
-  uut : display port map (
-    rst      => rst,
-    clk      => clk,
-    load     => load,
-    led      => led,
-    lat      => lat,
-    oe       => oe,
-    row_addr => row_addr,
-    addr     => addr,
-    data     => data
+  uut: display port map (
+    rst         => rst,
+    clk         => clk,
+    ram_addr    => ram_addr,
+    ram_data    => ram_data,
+    matrix_rows => matrix_rows,
+    matrix_cols => matrix_cols
   );
 
   process
   begin
-    clk <= '0';
-    wait for clk_period/2;
-    clk <= '1';
-    wait for clk_period/2;
-  end process;
-
-  process
-  begin
-    if addr = "000000" then
-      data <= (others => '1');
-    else
-      data <= (others => '0');
-    end if;
-    wait for clk_period;
-  end process;
-
-  process
-  begin
     rst <= '1';
-    wait for clk_period/2;
+    wait for CLK_PERIOD;
     rst <= '0';
     wait;
+  end process;
+
+  process
+  begin
+    clk <= '0';
+    wait for CLK_PERIOD/2;
+    clk <= '1';
+    wait for CLK_PERIOD/2;
+  end process;
+
+  -- Simulate the data in memory.
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      case ram_addr is
+      when "000001" =>
+        ram_data <= X"09";
+      when "000010" =>
+        ram_data <= X"0a";
+      when "000011" =>
+        ram_data <= X"0b";
+      when "000100" =>
+        ram_data <= X"0c";
+      when "000101" =>
+        ram_data <= X"0d";
+      when "000110" =>
+        ram_data <= X"0e";
+      when "000111" =>
+        ram_data <= X"0f";
+      when others =>
+        ram_data <= X"00";
+      end case;
+    end if;
   end process;
 end architecture;

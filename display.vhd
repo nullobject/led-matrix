@@ -1,194 +1,236 @@
 library ieee;
 
 use ieee.std_logic_1164.all;
-use ieee.math_real.log2;
 use ieee.numeric_std.all;
 
 -- This block implements a display controller. It continuously refreshes the
--- pixel data from RAM and converts it into display IO signals.
+-- display data from RAM and converts it into row/column signals.
+--
+-- The rows are refreshed from top to bottom. The leds in each row are
+-- pulse-width modulated.
 entity display is
   generic (
-    ADDR_WIDTH     : natural := 6;
-    DATA_WIDTH     : natural := 8;
-    DISPLAY_WIDTH  : natural := 8;
-    DISPLAY_HEIGHT : natural := 8
+    ADDR_WIDTH:     natural := 6;
+    DATA_WIDTH:     natural := 8;
+    DISPLAY_WIDTH:  natural := 8;
+    DISPLAY_HEIGHT: natural := 8
   );
   port (
-    rst : in std_logic;
-    clk : in std_logic;
+    rst: in std_logic;
+    clk: in std_logic;
 
     -- Memory IO
-    ram_addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    ram_data : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+    ram_addr: out unsigned(ADDR_WIDTH-1 downto 0);
+    ram_data: in  unsigned(DATA_WIDTH-1 downto 0);
 
-    -- Display IO
-    display_rows : out std_logic_vector(DISPLAY_HEIGHT-1 downto 0);
-    display_cols : out std_logic_vector(DISPLAY_WIDTH-1 downto 0)
+    -- Matrix IO
+    matrix_rows: out unsigned(DISPLAY_HEIGHT-1 downto 0);
+    matrix_cols: out unsigned(DISPLAY_WIDTH-1 downto 0)
   );
 end display;
 
 architecture arch of display is
-  constant DISPLAY_HEIGHT_LOG2 : natural := natural(log2(real(DISPLAY_HEIGHT)));
-  constant DISPLAY_WIDTH_LOG2  : natural := natural(log2(real(DISPLAY_WIDTH)));
+  -- The number of clock ticks to wait in the wait state. When loading data
+  -- into the shift register, we need to wait for the memory and gamma
+  -- correction to finish outputting their data.
+  constant WAIT_MAX: integer := 1;
 
-  -- The current pixel value.
-  signal pixel : std_logic_vector(7 downto 0);
+  type state_type is (INIT_STATE, LOAD_STATE, ADDR_STATE, WAIT_STATE, LATCH_STATE);
+  signal state, next_state: state_type;
 
-  -- Essential state machine signals
-  type state_type is (read_pixel_data, incr_ram_addr, incr_row_addr, latch);
-  signal state, next_state : state_type;
+  -- Flags
+  signal led, load, latch, oe, wait_en, pwm_inc, row_inc, col_inc: std_logic;
 
-  -- State machine signals
-  signal bpp_count, next_bpp_count : unsigned(DATA_WIDTH-1 downto 0);
-  signal row, next_row             : std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
-  signal addr, next_addr           : std_logic_vector(ADDR_WIDTH-1 downto 0);
-  signal led, next_led             : std_logic;
-  signal oe, next_oe               : std_logic;
-  signal inc_row, next_inc_row     : std_logic;
-  signal load, lat                 : std_logic;
+  -- Wait counter
+  signal wait_ctr: unsigned(0 downto 0);
 
-  signal leds_in, leds_out : std_logic_vector(DISPLAY_WIDTH-1 downto 0);
+  -- Pulse-width modulation counter
+  signal pwm_ctr: unsigned(DATA_WIDTH downto 0);
+
+  -- Address counter
+  signal address_ctr: unsigned(ADDR_WIDTH-1 downto 0);
+
+  -- Gamma-corrected data
+  signal gamma_data: unsigned(DATA_WIDTH-1 downto 0);
+
+  -- The shift register which the led values are loaded into.
+  signal shift_reg: unsigned(DISPLAY_WIDTH-1 downto 0);
+
+  -- The columns output register.
+  signal cols_reg: unsigned(DISPLAY_WIDTH-1 downto 0);
+
+  -- Row address
+  signal row_addr: unsigned(2 downto 0);
 begin
-  gamma : entity work.gamma
+  -- Apply gamma-correction to the display data.
+  gamma_correction: entity work.gamma
     generic map (
-      gamma      => 2.8,
+      GAMMA      => 1.8,
       DATA_WIDTH => DATA_WIDTH
     )
     port map (
+      clk      => clk,
       data_in  => ram_data,
-      data_out => pixel
+      data_out => gamma_data
     );
 
-  ram_addr <= addr;
-
-  -- State register
-  process(rst, clk)
+  -- The main process that updates the internal registers for the display.
+  main_proc: process(rst, clk)
   begin
     if rst = '1' then
-      state     <= read_pixel_data;
-      bpp_count <= (others => '0');
-      row       <= (others => '0');
-      addr      <= (others => '0');
-      led       <= '0';
-      inc_row   <= '0';
-      oe        <= '0';
+      state <= INIT_STATE;
+      row_addr <= (others => '0');
+      shift_reg <= (others => '0');
+      cols_reg <= (others => '0');
     elsif rising_edge(clk) then
-      state     <= next_state;
-      bpp_count <= next_bpp_count;
-      row       <= next_row;
-      addr      <= next_addr;
-      led       <= next_led;
-      inc_row   <= next_inc_row;
-      oe        <= next_oe;
-    end if;
-  end process;
+      -- Update the current state.
+      state <= next_state;
 
-  -- Next-state logic
-  process(state, bpp_count, row, addr, led, oe, pixel, inc_row) is
-  begin
-    -- Default register next-state assignments
-    next_bpp_count <= bpp_count;
-    next_row       <= row;
-    next_addr      <= addr;
-    next_led       <= '0';
-    next_oe        <= oe;
-    next_inc_row   <= inc_row;
+      -- Reset the row address when latching a new row.
+      if latch = '1' and oe = '1' then
+        row_addr <= address_ctr(ADDR_WIDTH-1 downto ADDR_WIDTH-3);
+      end if;
 
-    -- Default signal assignments
-    load <= '0';
-    lat  <= '0';
-
-    -- States
-    case state is
-      when read_pixel_data =>
-        if unsigned(pixel) > bpp_count then
-          next_led <= '1';
-        end if;
-
-        next_state <= incr_ram_addr;
-
-      when incr_ram_addr =>
-        -- Pulse the output clock.
-        load <= '1';
-
-        if addr(2 downto 0) = "111" then
-          if inc_row = '1' then
-            next_inc_row <= '0';
-            next_oe <= '1';
-            next_state <= incr_row_addr;
-          elsif bpp_count = unsigned(to_signed(-1, DATA_WIDTH)) then
-            next_addr <= std_logic_vector(unsigned(addr) + 1);
-            next_inc_row <= '1';
-            next_state <= latch;
-          else
-            next_state <= latch;
-          end if;
-          next_bpp_count <= bpp_count + 1;
-        else
-          next_addr <= std_logic_vector(unsigned(addr) + 1);
-          next_state <= read_pixel_data;
-        end if;
-
-      when incr_row_addr =>
-        -- Increment the row address.
-        next_row <= std_logic_vector(unsigned(row) + 1);
-
-        next_state <= latch;
-
-      when latch =>
-        -- Latch the row.
-        lat <= '1';
-
-        -- Enable the display.
-        next_oe <= '0';
-
-        next_addr <= addr(ADDR_WIDTH-1 downto 3) & "000";
-
-        next_state <= read_pixel_data;
-    end case;
-  end process;
-
-  -- Data on the `led` input is loaded when the `load` signal is high on each rising edge of the `clk` signal.
-  process(rst, clk)
-  begin
-    if rst = '1' then
-      leds_in <= (others => '0');
-    elsif rising_edge(clk) then
+      -- Load display data into the column register.
       if load = '1' then
-        leds_in <= leds_in(DISPLAY_WIDTH-2 downto 0) & led;
+        shift_reg <= shift_reg(DISPLAY_WIDTH-2 downto 0) & led;
+      end if;
+
+      -- Latch the column register.
+      if latch = '1' then
+        cols_reg <= shift_reg;
       end if;
     end if;
-  end process;
+  end process main_proc;
 
-  -- Latch the LEDs when the `lat` signal is high.
-  process(clk)
+  -- Updates the PWM counter.
+  pwm_proc: process(rst, clk)
   begin
-    if rising_edge(clk) then
-      if lat = '1' then
-        leds_out <= leds_in;
+    if rst = '1' then
+      pwm_ctr <= (others => '0');
+    elsif rising_edge(clk) then
+      if pwm_inc = '1' then
+        if pwm_ctr = 256 then
+          pwm_ctr <= (others => '0');
+        else
+          pwm_ctr <= pwm_ctr + 1;
+        end if;
       end if;
     end if;
-  end process;
+  end process pwm_proc;
 
-  -- Output the LEDs when the `oe` signal is low.
-  process(clk)
+  -- Updates the display address according to the increment flags.
+  addr_proc: process(rst, clk)
+  begin
+    if rst = '1' then
+      address_ctr <= (others => '0');
+    elsif rising_edge(clk) then
+      if col_inc = '1' then
+        if pwm_inc = '1' and row_inc = '0' then
+          address_ctr <= address_ctr(ADDR_WIDTH-1 downto 3) & "000";
+        else
+          address_ctr <= address_ctr + 1;
+        end if;
+      end if;
+    end if;
+  end process addr_proc;
+
+  -- Increments the wait counter.
+  wait_proc: process(clk)
   begin
     if rising_edge(clk) then
-      if oe = '0' then
-        display_cols <= leds_out;
+      if wait_en = '0' then
+        wait_ctr <= (others => '0');
       else
-        display_cols <= (others => '0');
+        wait_ctr <= wait_ctr + 1;
       end if;
     end if;
-  end process;
+  end process wait_proc;
 
-  with row select
-    display_rows <= "10000000" when "111",
-                    "01000000" when "110",
-                    "00100000" when "101",
-                    "00010000" when "100",
-                    "00001000" when "011",
-                    "00000100" when "010",
-                    "00000010" when "001",
-                    "00000001" when others;
+  -- The combinatorial process for the state machine.
+  comb_proc: process(state, address_ctr, pwm_ctr, wait_ctr, oe) is
+  begin
+    -- Default register assignments.
+    next_state <= state;
+    latch      <= '0';
+    load       <= '0';
+    oe         <= '0';
+    wait_en    <= '0';
+    pwm_inc    <= '0';
+    col_inc    <= '0';
+    row_inc    <= '0';
+
+    case state is
+    -- The initial state where no outputs are enabled.
+    when INIT_STATE =>
+      next_state <= LOAD_STATE;
+
+    -- Load the LED bit into the shift register.
+    when LOAD_STATE =>
+      load <= '1';
+
+      if address_ctr(2 downto 0) = "111" then -- end of row
+        next_state <= LATCH_STATE;
+      else
+        next_state <= ADDR_STATE;
+      end if;
+
+    -- Update the address counter.
+    when ADDR_STATE =>
+      col_inc <= '1';
+
+      if address_ctr(2 downto 0) = "111" then -- end of row
+        pwm_inc <= '1';
+      end if;
+
+      if pwm_ctr = 256 then -- end of PWM cycle
+        row_inc <= '1';
+      end if;
+
+      next_state <= WAIT_STATE;
+
+    -- Wait for the memory and gamma correction to finish outputting their
+    -- data.
+    when WAIT_STATE =>
+      if wait_ctr = WAIT_MAX then
+        if oe = '1' then
+          oe <= '0';
+        end if;
+
+        next_state <= LOAD_STATE;
+      else
+        wait_en <= '1';
+      end if;
+
+    -- Latch the current data into the columns register.
+    when LATCH_STATE =>
+      latch <= '1';
+
+      if pwm_ctr = 0 then -- beginning of PWM cycle
+        oe <= '1';
+      end if;
+
+      next_state <= ADDR_STATE;
+    end case;
+  end process comb_proc;
+
+  -- Set the RAM address.
+  ram_addr <= address_ctr;
+
+  -- PWM the led bit.
+  led <= '1' when (pwm_ctr < ('0' & gamma_data)) else '0';
+
+  -- Decode the rows output.
+  with row_addr select
+    matrix_rows <= "10000000" when "111",
+                   "01000000" when "110",
+                   "00100000" when "101",
+                   "00010000" when "100",
+                   "00001000" when "011",
+                   "00000100" when "010",
+                   "00000010" when "001",
+                   "00000001" when others;
+
+  -- Set the columns out.
+  matrix_cols <= cols_reg when (oe = '0') else (others => '0');
 end arch;

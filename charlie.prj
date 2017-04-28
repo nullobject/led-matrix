@@ -1,7 +1,6 @@
 vhdl work "gamma.vhd"
-vhdl work "memory.vhd"
 vhdl work "spi_slave.vhd"
+vhdl work "memory.vhd"
 vhdl work "display.vhd"
 vhdl work "clock_generator.vhd"
-vhdl work "button_driver.vhd"
 vhdl work "top.vhd"
