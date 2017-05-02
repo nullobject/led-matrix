@@ -1,32 +1,32 @@
-library ieee;
+library IEEE;
 
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
 
 use work.automata.all;
 
 entity button_driver is
   port (
-    rst: in std_logic;
-    clk: in std_logic;
+    rst : in std_logic;
+    clk : in std_logic;
 
     -- Display IO
-    row_addr: in std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
+    row_addr : in std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
 
     -- Memory IO
-    addr: out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    data: out std_logic_vector(DATA_WIDTH-1 downto 0);
-    we:   out std_logic;
+    addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
+    data : out std_logic_vector(DATA_WIDTH-1 downto 0);
+    we   : out std_logic;
 
     -- Display IO
-    buttons: in std_logic_vector(DISPLAY_WIDTH-1 downto 0)
+    buttons : in std_logic_vector(DISPLAY_WIDTH-1 downto 0)
   );
 end button_driver;
 
 architecture arch of button_driver is
-  signal counter: unsigned(2 downto 0) := (others => '0');
+  signal counter : unsigned(2 downto 0) := (others => '0');
 begin
-  process(rst, clk)
+  process(clk, rst)
   begin
     if rst = '1' then
     elsif rising_edge(clk) then

@@ -1,48 +1,66 @@
-library ieee;
+library IEEE;
 
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
 
 entity charlie is
   port (
-    rst_in: in std_logic;
-    clk:    in std_logic;
+    rst_in : in std_logic;
+    clk    : in std_logic;
 
     -- Display IO
-    rows:    out unsigned(7 downto 0);
-    cols:    out unsigned(7 downto 0);
-    buttons: in  unsigned(7 downto 0);
+    rows    : out unsigned(7 downto 0);
+    cols    : out unsigned(7 downto 0);
+    buttons : in  unsigned(7 downto 0);
 
     -- SPI
-    ss:   in  std_logic;
-    sck:  in  std_logic;
-    mosi: in  std_logic;
-    miso: out std_logic;
+    ss   : in  std_logic;
+    sck  : in  std_logic;
+    mosi : in  std_logic;
+    miso : out std_logic;
 
-    debug: out std_logic_vector(3 downto 0)
+    debug : out std_logic_vector(3 downto 0)
   );
 end charlie;
 
 architecture arch of charlie is
-  constant DATA_WIDTH: natural := 8;
-  constant ADDR_WIDTH: natural := 6;
+  constant RAM_ADDR_WIDTH : natural := 7;
+  constant RAM_DATA_WIDTH : natural := 8;
 
-  constant DISPLAY_WIDTH:  natural := 8;
-  constant DISPLAY_HEIGHT: natural := 8;
+  constant DISPLAY_ADDR_WIDTH : natural := 6;
+  constant DISPLAY_DATA_WIDTH : natural := 8;
 
-  type state_type is (RESET_STATE, ADDR_STATE, WAIT_STATE, DATA_STATE, INC_STATE);
-  signal state, next_state: state_type;
+  constant SPI_DATA_WIDTH : natural := 8;
 
-  signal ram_we, next_ram_we: std_logic;
-  signal ram_addr_a, next_ram_addr_a, ram_addr_b: unsigned(ADDR_WIDTH-1 downto 0);
-  signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b: unsigned(DATA_WIDTH-1 downto 0);
+  constant DISPLAY_WIDTH  : natural := 8;
+  constant DISPLAY_HEIGHT : natural := 8;
 
-  signal spi_rx_data, spi_tx_data, next_spi_tx_data: std_logic_vector(DATA_WIDTH-1 downto 0);
-  signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack: std_logic;
+  constant READ_COMMAND      : integer := 0;
+  constant WRITE_COMMAND     : integer := 1;
+  constant FLIP_PAGE_COMMAND : integer := 2;
 
-  signal clk10, clk50, locked, rst: std_logic;
+  type state_type is (RESET_STATE, CMD_STATE, CMD_WAIT_STATE, WRITE_STATE, READ_STATE, READ_INC_STATE, WRITE_INC_STATE);
+  signal state, next_state : state_type;
+
+  signal clk10, clk50, locked, rst : std_logic;
+
+  signal ram_we, next_ram_we : std_logic;
+  signal ram_addr_a : unsigned(RAM_ADDR_WIDTH-1 downto 0);
+  signal ram_addr_b : unsigned(RAM_ADDR_WIDTH-1 downto 0);
+  signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
+
+  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
+  signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
+
+  signal write_en, next_write_en : std_logic;
+
+  -- The current page in memory being displayed.
+  signal page, next_page : std_logic;
+
+  signal paged_display_addr : unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
+  signal paged_ram_addr, next_paged_ram_addr : unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
 begin
-  clock_generator: entity work.clock_generator
+  clock_generator : entity work.clock_generator
     port map (
       clkin_in        => clk,
       rst_in          => rst_in,
@@ -52,10 +70,10 @@ begin
       locked_out      => locked
     );
 
-  memory: entity work.memory
+  memory : entity work.memory
     generic map (
-      ADDR_WIDTH => ADDR_WIDTH,
-      DATA_WIDTH => DATA_WIDTH
+      ADDR_WIDTH => RAM_ADDR_WIDTH,
+      DATA_WIDTH => RAM_DATA_WIDTH
     )
     port map (
       clk    => clk50,
@@ -67,25 +85,25 @@ begin
       dout_b => ram_dout_b
     );
 
-  display: entity work.display
+  display : entity work.display
     generic map (
-      ADDR_WIDTH     => ADDR_WIDTH,
-      DATA_WIDTH     => DATA_WIDTH,
+      ADDR_WIDTH     => DISPLAY_ADDR_WIDTH,
+      DATA_WIDTH     => DISPLAY_DATA_WIDTH,
       DISPLAY_WIDTH  => DISPLAY_WIDTH,
       DISPLAY_HEIGHT => DISPLAY_HEIGHT
     )
     port map (
       rst          => rst,
       clk          => clk50,
-      ram_addr     => ram_addr_b,
+      ram_addr     => paged_display_addr,
       ram_data     => ram_dout_b,
       matrix_rows  => rows,
       matrix_cols  => cols
     );
 
-  spi_slave: entity work.spi_slave
+  spi_slave : entity work.spi_slave
     generic map (
-      N => DATA_WIDTH
+      N => SPI_DATA_WIDTH
     )
     port map (
       clk_i       => clk50,
@@ -102,73 +120,124 @@ begin
       state_dbg_o => debug
     );
 
-  sync_proc: process(rst, clk50, ss)
+  sync_proc : process(clk50)
   begin
-    if rst = '1' or ss = '1' then
-      state <= RESET_STATE;
-    elsif rising_edge(clk50) then
-      state <= next_state;
-      ram_we <= next_ram_we;
-      ram_addr_a <= next_ram_addr_a;
-      ram_din_a <= next_ram_din_a;
-      spi_wren <= next_spi_wren;
+    if rising_edge(clk50) then
+      if rst = '1' or ss = '1' then
+        state <= RESET_STATE;
+      else
+        state <= next_state;
+        ram_we <= next_ram_we;
+        paged_ram_addr <= next_paged_ram_addr;
+        ram_din_a <= next_ram_din_a;
+        spi_tx_data <= next_spi_tx_data;
+        -- TODO: Debug SPI.
+        -- spi_tx_data <= (others => '1');
+        -- spi_wren <= next_spi_wren;
+        spi_wren <= '1';
+        write_en <= next_write_en;
+        page <= next_page;
+      end if;
     end if;
   end process sync_proc;
 
-  comb_proc: process(state, spi_rx_data, spi_done, ram_addr_a)
+  comb_proc : process(state, spi_done, spi_req, write_en)
   begin
     -- Default register assignments.
-    next_state      <= state;
-    next_ram_addr_a <= ram_addr_a;
-    next_ram_din_a  <= ram_din_a;
-    next_ram_we     <= '0';
+    next_state          <= state;
+    next_ram_we         <= '0';
+    next_paged_ram_addr <= paged_ram_addr;
+    next_ram_din_a      <= ram_din_a;
+    next_spi_tx_data    <= spi_tx_data;
+    next_spi_wren       <= '0';
+    next_write_en       <= write_en;
+    next_page           <= page;
 
     case state is
     -- Reset the state machine.
     when RESET_STATE =>
-      next_state <= ADDR_STATE;
+      next_state <= CMD_STATE;
+      next_paged_ram_addr <= (others => '0');
+      next_ram_din_a <= (others => '0');
+      next_spi_tx_data <= (others => '0');
+      next_write_en <= '0';
 
-    -- Wait for data to be received.
-    when ADDR_STATE =>
+    -- Wait for a command.
+    when CMD_STATE =>
       if spi_done = '1' then
-        next_ram_addr_a <= unsigned(spi_rx_data(ADDR_WIDTH-1 downto 0));
-        next_state <= WAIT_STATE;
+        next_state <= CMD_WAIT_STATE;
+
+        case to_integer(unsigned(spi_rx_data)) is
+        when READ_COMMAND =>
+          next_write_en <= '0';
+        when WRITE_COMMAND =>
+          next_write_en <= '1';
+        when FLIP_PAGE_COMMAND =>
+          next_page <= not page;
+          next_state <= RESET_STATE;
+        when others =>
+          next_state <= RESET_STATE;
+        end case;
       end if;
 
-    when WAIT_STATE =>
+    when CMD_WAIT_STATE =>
       if spi_done = '0' then
-        next_state <= DATA_STATE;
+        if write_en = '1' then
+          next_state <= WRITE_STATE;
+        else
+          next_state <= READ_STATE;
+
+          -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
+          next_spi_tx_data <= std_logic_vector(ram_dout_a);
+          next_paged_ram_addr <= paged_ram_addr + 1;
+        end if;
       end if;
 
-    -- Read the next byte.
-    when DATA_STATE =>
+    when READ_STATE =>
+      if spi_req = '1' then
+        next_state <= READ_INC_STATE;
+        next_spi_tx_data <= std_logic_vector(ram_dout_a);
+      end if;
+
+    when READ_INC_STATE =>
+      if spi_req = '0' then
+        next_state <= READ_STATE;
+
+        -- Only allow reading the display buffer (0-40h).
+        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+          next_spi_wren <= '1';
+        end if;
+
+        next_paged_ram_addr <= paged_ram_addr + 1;
+      end if;
+
+    when WRITE_STATE =>
       if spi_done = '1' then
-        -- Only allow writing to the display buffer (0-40h).
-        if to_integer(ram_addr_a) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+        next_state <= WRITE_INC_STATE;
+
+        -- Only allow writing the display buffer (0-40h).
+        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
           next_ram_we <= '1';
         end if;
+
         next_ram_din_a <= unsigned(spi_rx_data);
-        next_state <= INC_STATE;
       end if;
 
-    when INC_STATE =>
+    when WRITE_INC_STATE =>
       if spi_done = '0' then
-        next_ram_addr_a <= ram_addr_a + 1;
-        next_state <= DATA_STATE;
+        next_state <= WRITE_STATE;
+        next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
+
+    when others =>
+      next_state <= RESET_STATE;
     end case;
   end process comb_proc;
 
-  -- button_driver: entity work.button_driver
-  --   port map (
-  --     rst      => rst,
-  --     clk      => clk50,
-  --     row_addr => display_row_addr,
-  --     addr     => ram_addr_a,
-  --     data     => ram_din_a,
-  --     we       => ram_we,
-  --     buttons  => buttons
-  --   );
-
   rst <= not locked;
+
+  -- Data is read from/written to one page, while display data is read from the
+  -- other page.
+  ram_addr_a <= page & paged_ram_addr;
+  ram_addr_b <= (not page) & paged_display_addr;
 end arch;
