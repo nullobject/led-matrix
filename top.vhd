@@ -54,6 +54,8 @@ architecture arch of charlie is
 
   signal write_en, next_write_en : std_logic;
 
+  signal display_row_addr : unsigned(2 downto 0);
+
   -- The current page in memory being displayed.
   signal page, next_page : std_logic;
 
@@ -70,7 +72,7 @@ begin
       locked_out      => locked
     );
 
-  memory : entity work.memory
+  ram : entity work.memory
     generic map (
       ADDR_WIDTH => RAM_ADDR_WIDTH,
       DATA_WIDTH => RAM_DATA_WIDTH
@@ -98,7 +100,8 @@ begin
       ram_addr     => paged_display_addr,
       ram_data     => ram_dout_b,
       matrix_rows  => rows,
-      matrix_cols  => cols
+      matrix_cols  => cols,
+      row_addr     => display_row_addr
     );
 
   spi_slave : entity work.spi_slave

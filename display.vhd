@@ -16,12 +16,14 @@ entity display is
     DISPLAY_HEIGHT : natural := 8
   );
   port (
-    rst : in std_logic;
     clk : in std_logic;
+    rst : in std_logic;
 
     -- Memory IO
     ram_addr : out unsigned(ADDR_WIDTH-1 downto 0);
     ram_data : in  unsigned(DATA_WIDTH-1 downto 0);
+
+    row_addr : out unsigned(2 downto 0);
 
     -- Matrix IO
     matrix_rows : out unsigned(DISPLAY_HEIGHT-1 downto 0);
@@ -60,7 +62,7 @@ architecture arch of display is
   signal cols_reg : unsigned(DISPLAY_WIDTH-1 downto 0);
 
   -- Row address
-  signal row_addr : unsigned(2 downto 0);
+  signal row_addr_reg : unsigned(2 downto 0);
 begin
   -- Apply gamma-correction to the display data.
   gamma_correction : entity work.gamma
@@ -124,7 +126,6 @@ begin
     if rising_edge(clk) then
       if rst = '1' then
         state <= RESET_STATE;
-        row_addr <= (others => '0');
         shift_reg <= (others => '0');
         cols_reg <= (others => '0');
       else
@@ -133,7 +134,7 @@ begin
 
         -- Reset the row address when latching a new row.
         if latch = '1' and oe = '1' then
-          row_addr <= address_ctr(ADDR_WIDTH-1 downto ADDR_WIDTH-3);
+          row_addr_reg <= address_ctr(ADDR_WIDTH-1 downto ADDR_WIDTH-3);
         end if;
 
         -- Load display data into the column register.
@@ -213,9 +214,6 @@ begin
       end if;
 
       next_state <= ADDR_STATE;
-
-    when others =>
-      next_state <= RESET_STATE;
     end case;
   end process comb_proc;
 
@@ -225,8 +223,10 @@ begin
   -- PWM the led bit.
   led <= '1' when (pwm_ctr < ('0' & gamma_data)) else '0';
 
+  row_addr <= row_addr_reg;
+
   -- Decode the rows output.
-  with row_addr select
+  with row_addr_reg select
     matrix_rows <= "10000000" when "111",
                    "01000000" when "110",
                    "00100000" when "101",
