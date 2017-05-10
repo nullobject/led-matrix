@@ -3,17 +3,17 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
--- This block implements a display controller. It continuously refreshes the
--- display data from memory and converts it into row/column signals.
+-- This block implements a LED matrix controller. It continuously refreshes the
+-- matrix data from memory and converts it into row/column signals.
 --
 -- The rows are refreshed from top to bottom. The leds in each row are
 -- pulse-width modulated.
-entity display is
+entity matrix is
   generic (
-    ADDR_WIDTH     : natural := 6;
-    DATA_WIDTH     : natural := 8;
-    DISPLAY_WIDTH  : natural := 8;
-    DISPLAY_HEIGHT : natural := 8
+    ADDR_WIDTH : natural := 6;
+    DATA_WIDTH : natural := 8;
+    WIDTH      : natural := 8;
+    HEIGHT     : natural := 8
   );
   port (
     clk : in std_logic;
@@ -26,12 +26,12 @@ entity display is
     row_addr : out unsigned(2 downto 0);
 
     -- Matrix IO
-    matrix_rows : out unsigned(DISPLAY_HEIGHT-1 downto 0);
-    matrix_cols : out unsigned(DISPLAY_WIDTH-1 downto 0)
+    matrix_rows : out unsigned(HEIGHT-1 downto 0);
+    matrix_cols : out unsigned(WIDTH-1 downto 0)
   );
-end display;
+end matrix;
 
-architecture arch of display is
+architecture arch of matrix is
   -- The number of clock ticks to wait in the wait state. When loading data
   -- into the shift register, we need to wait for the memory and gamma
   -- correction to finish outputting their data.
@@ -56,15 +56,15 @@ architecture arch of display is
   signal gamma_data : unsigned(DATA_WIDTH-1 downto 0);
 
   -- The shift register which the led values are loaded into.
-  signal shift_reg : unsigned(DISPLAY_WIDTH-1 downto 0);
+  signal shift_reg : unsigned(WIDTH-1 downto 0);
 
   -- The columns output register.
-  signal cols_reg : unsigned(DISPLAY_WIDTH-1 downto 0);
+  signal cols_reg : unsigned(WIDTH-1 downto 0);
 
   -- Row address
   signal row_addr_reg : unsigned(2 downto 0);
 begin
-  -- Apply gamma-correction to the display data.
+  -- Apply gamma-correction to the matrix data.
   gamma_correction : entity work.gamma
     generic map (
       GAMMA      => 1.8,
@@ -104,7 +104,7 @@ begin
     end if;
   end process pwm_proc;
 
-  -- Updates the display address according to the increment flags.
+  -- Updates the matrix address according to the increment flags.
   addr_proc : process(clk)
   begin
     if rising_edge(clk) then
@@ -120,7 +120,7 @@ begin
     end if;
   end process addr_proc;
 
-  -- The main process that updates the internal registers for the display.
+  -- The main process that updates the internal registers for the matrix.
   main_proc : process(clk)
   begin
     if rising_edge(clk) then
@@ -139,7 +139,7 @@ begin
 
         -- Load display data into the column register.
         if load = '1' then
-          shift_reg <= shift_reg(DISPLAY_WIDTH-2 downto 0) & led;
+          shift_reg <= shift_reg(WIDTH-2 downto 0) & led;
         end if;
 
         -- Latch the column register.

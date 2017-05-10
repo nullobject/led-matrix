@@ -24,16 +24,16 @@ entity charlie is
 end charlie;
 
 architecture arch of charlie is
-  constant RAM_ADDR_WIDTH : natural := 7;
-  constant RAM_DATA_WIDTH : natural := 8;
+  constant MATRIX_RAM_ADDR_WIDTH : natural := 7;
+  constant MATRIX_RAM_DATA_WIDTH : natural := 8;
 
-  constant DISPLAY_ADDR_WIDTH : natural := 6;
-  constant DISPLAY_DATA_WIDTH : natural := 8;
+  constant MATRIX_ADDR_WIDTH : natural := 6;
+  constant MATRIX_DATA_WIDTH : natural := 8;
 
   constant SPI_DATA_WIDTH : natural := 8;
 
-  constant DISPLAY_WIDTH  : natural := 8;
-  constant DISPLAY_HEIGHT : natural := 8;
+  constant MATRIX_WIDTH  : natural := 8;
+  constant MATRIX_HEIGHT : natural := 8;
 
   constant READ_COMMAND      : integer := 0;
   constant WRITE_COMMAND     : integer := 1;
@@ -44,12 +44,12 @@ architecture arch of charlie is
 
   signal clk10, clk50, locked, rst : std_logic;
 
-  signal ram_we, next_ram_we : std_logic;
-  signal ram_addr_a : unsigned(RAM_ADDR_WIDTH-1 downto 0);
-  signal ram_addr_b : unsigned(RAM_ADDR_WIDTH-1 downto 0);
-  signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
+  signal matrix_ram_we, next_matrix_ram_we : std_logic;
+  signal matrix_ram_addr_a : unsigned(MATRIX_RAM_ADDR_WIDTH-1 downto 0);
+  signal matrix_ram_addr_b : unsigned(MATRIX_RAM_ADDR_WIDTH-1 downto 0);
+  signal matrix_ram_din_a, next_matrix_ram_din_a, matrix_ram_dout_a, matrix_ram_dout_b : unsigned(MATRIX_RAM_DATA_WIDTH-1 downto 0);
 
-  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
+  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(MATRIX_RAM_DATA_WIDTH-1 downto 0);
   signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
 
   signal write_en, next_write_en : std_logic;
@@ -59,8 +59,8 @@ architecture arch of charlie is
   -- The current page in memory being displayed.
   signal page, next_page : std_logic;
 
-  signal paged_display_addr : unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
-  signal paged_ram_addr, next_paged_ram_addr : unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
+  signal paged_display_addr : unsigned(MATRIX_ADDR_WIDTH-1 downto 0);
+  signal paged_matrix_ram_addr, next_paged_matrix_ram_addr : unsigned(MATRIX_ADDR_WIDTH-1 downto 0);
 begin
   clock_generator : entity work.clock_generator
     port map (
@@ -72,36 +72,36 @@ begin
       locked_out      => locked
     );
 
-  ram : entity work.memory
+  matrix_ram : entity work.memory
     generic map (
-      ADDR_WIDTH => RAM_ADDR_WIDTH,
-      DATA_WIDTH => RAM_DATA_WIDTH
+      ADDR_WIDTH => MATRIX_RAM_ADDR_WIDTH,
+      DATA_WIDTH => MATRIX_RAM_DATA_WIDTH
     )
     port map (
       clk    => clk50,
-      we     => ram_we,
-      addr_a => ram_addr_a,
-      din_a  => ram_din_a,
-      dout_a => ram_dout_a,
-      addr_b => ram_addr_b,
-      dout_b => ram_dout_b
+      we     => matrix_ram_we,
+      addr_a => matrix_ram_addr_a,
+      din_a  => matrix_ram_din_a,
+      dout_a => matrix_ram_dout_a,
+      addr_b => matrix_ram_addr_b,
+      dout_b => matrix_ram_dout_b
     );
 
-  display : entity work.display
+  matrix : entity work.matrix
     generic map (
-      ADDR_WIDTH     => DISPLAY_ADDR_WIDTH,
-      DATA_WIDTH     => DISPLAY_DATA_WIDTH,
-      DISPLAY_WIDTH  => DISPLAY_WIDTH,
-      DISPLAY_HEIGHT => DISPLAY_HEIGHT
+      ADDR_WIDTH => MATRIX_ADDR_WIDTH,
+      DATA_WIDTH => MATRIX_DATA_WIDTH,
+      WIDTH      => MATRIX_WIDTH,
+      HEIGHT     => MATRIX_HEIGHT
     )
     port map (
-      rst          => rst,
-      clk          => clk50,
-      ram_addr     => paged_display_addr,
-      ram_data     => ram_dout_b,
-      matrix_rows  => rows,
-      matrix_cols  => cols,
-      row_addr     => display_row_addr
+      rst         => rst,
+      clk         => clk50,
+      ram_addr    => paged_display_addr,
+      ram_data    => matrix_ram_dout_b,
+      matrix_rows => rows,
+      matrix_cols => cols,
+      row_addr    => display_row_addr
     );
 
   spi_slave : entity work.spi_slave
@@ -130,9 +130,9 @@ begin
         state <= RESET_STATE;
       else
         state <= next_state;
-        ram_we <= next_ram_we;
-        paged_ram_addr <= next_paged_ram_addr;
-        ram_din_a <= next_ram_din_a;
+        matrix_ram_we <= next_matrix_ram_we;
+        paged_matrix_ram_addr <= next_paged_matrix_ram_addr;
+        matrix_ram_din_a <= next_matrix_ram_din_a;
         spi_tx_data <= next_spi_tx_data;
         -- TODO: Debug SPI.
         -- spi_tx_data <= (others => '1');
@@ -148,9 +148,9 @@ begin
   begin
     -- Default register assignments.
     next_state          <= state;
-    next_ram_we         <= '0';
-    next_paged_ram_addr <= paged_ram_addr;
-    next_ram_din_a      <= ram_din_a;
+    next_matrix_ram_we         <= '0';
+    next_paged_matrix_ram_addr <= paged_matrix_ram_addr;
+    next_matrix_ram_din_a      <= matrix_ram_din_a;
     next_spi_tx_data    <= spi_tx_data;
     next_spi_wren       <= '0';
     next_write_en       <= write_en;
@@ -160,8 +160,8 @@ begin
     -- Reset the state machine.
     when RESET_STATE =>
       next_state <= CMD_STATE;
-      next_paged_ram_addr <= (others => '0');
-      next_ram_din_a <= (others => '0');
+      next_paged_matrix_ram_addr <= (others => '0');
+      next_matrix_ram_din_a <= (others => '0');
       next_spi_tx_data <= (others => '0');
       next_write_en <= '0';
 
@@ -191,15 +191,15 @@ begin
           next_state <= READ_STATE;
 
           -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
-          next_spi_tx_data <= std_logic_vector(ram_dout_a);
-          next_paged_ram_addr <= paged_ram_addr + 1;
+          next_spi_tx_data <= std_logic_vector(matrix_ram_dout_a);
+          next_paged_matrix_ram_addr <= paged_matrix_ram_addr + 1;
         end if;
       end if;
 
     when READ_STATE =>
       if spi_req = '1' then
         next_state <= READ_INC_STATE;
-        next_spi_tx_data <= std_logic_vector(ram_dout_a);
+        next_spi_tx_data <= std_logic_vector(matrix_ram_dout_a);
       end if;
 
     when READ_INC_STATE =>
@@ -207,11 +207,11 @@ begin
         next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+        if to_integer(paged_matrix_ram_addr) < MATRIX_WIDTH*MATRIX_HEIGHT then
           next_spi_wren <= '1';
         end if;
 
-        next_paged_ram_addr <= paged_ram_addr + 1;
+        next_paged_matrix_ram_addr <= paged_matrix_ram_addr + 1;
       end if;
 
     when WRITE_STATE =>
@@ -219,17 +219,17 @@ begin
         next_state <= WRITE_INC_STATE;
 
         -- Only allow writing the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_ram_we <= '1';
+        if to_integer(paged_matrix_ram_addr) < MATRIX_WIDTH*MATRIX_HEIGHT then
+          next_matrix_ram_we <= '1';
         end if;
 
-        next_ram_din_a <= unsigned(spi_rx_data);
+        next_matrix_ram_din_a <= unsigned(spi_rx_data);
       end if;
 
     when WRITE_INC_STATE =>
       if spi_done = '0' then
         next_state <= WRITE_STATE;
-        next_paged_ram_addr <= paged_ram_addr + 1;
+        next_paged_matrix_ram_addr <= paged_matrix_ram_addr + 1;
       end if;
 
     when others =>
@@ -241,6 +241,6 @@ begin
 
   -- Data is read from/written to one page, while display data is read from the
   -- other page.
-  ram_addr_a <= page & paged_ram_addr;
-  ram_addr_b <= (not page) & paged_display_addr;
+  matrix_ram_addr_a <= page & paged_matrix_ram_addr;
+  matrix_ram_addr_b <= (not page) & paged_display_addr;
 end arch;
