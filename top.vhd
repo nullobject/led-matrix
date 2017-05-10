@@ -96,12 +96,28 @@ begin
     )
     port map (
       rst          => rst,
-      clk          => clk50,
+      clk          => clk10,
       ram_addr     => paged_display_addr,
       ram_data     => ram_dout_b,
       matrix_rows  => rows,
       matrix_cols  => cols,
       row_addr     => display_row_addr
+    );
+
+  button_matrix : entity work.button_driver
+    generic map(
+      DISPLAY_ADDR_WIDTH => DISPLAY_ADDR_WIDTH,
+      RAM_DATA_WIDTH => RAM_DATA_WIDTH,
+      DISPLAY_WIDTH => DISPLAY_WIDTH
+    )
+    port map (
+      clk      => clk10,
+      rst      => rst,
+      buttons  => buttons,
+      ram_addr => paged_ram_addr,
+      ram_data => ram_din_a,
+      ram_we   => ram_we,
+      row_addr => display_row_addr
     );
 
   spi_slave : entity work.spi_slave
@@ -123,124 +139,126 @@ begin
       state_dbg_o => debug
     );
 
-  sync_proc : process(clk50)
-  begin
-    if rising_edge(clk50) then
-      if rst = '1' or ss = '1' then
-        state <= RESET_STATE;
-      else
-        state <= next_state;
-        ram_we <= next_ram_we;
-        paged_ram_addr <= next_paged_ram_addr;
-        ram_din_a <= next_ram_din_a;
-        spi_tx_data <= next_spi_tx_data;
-        -- TODO: Debug SPI.
-        -- spi_tx_data <= (others => '1');
-        -- spi_wren <= next_spi_wren;
-        spi_wren <= '1';
-        write_en <= next_write_en;
-        page <= next_page;
-      end if;
-    end if;
-  end process sync_proc;
+  -- sync_proc : process(clk50)
+  -- begin
+  --   if rising_edge(clk50) then
+  --     if rst = '1' or ss = '1' then
+  --       state <= RESET_STATE;
+  --     else
+  --       state <= next_state;
+  --       ram_we <= next_ram_we;
+  --       paged_ram_addr <= next_paged_ram_addr;
+  --       ram_din_a <= next_ram_din_a;
+  --       spi_tx_data <= next_spi_tx_data;
+  --       -- TODO: Debug SPI.
+  --       -- spi_tx_data <= (others => '1');
+  --       -- spi_wren <= next_spi_wren;
+  --       spi_wren <= '1';
+  --       write_en <= next_write_en;
+  --       page <= next_page;
+  --     end if;
+  --   end if;
+  -- end process sync_proc;
 
-  comb_proc : process(state, spi_done, spi_req, write_en)
-  begin
-    -- Default register assignments.
-    next_state          <= state;
-    next_ram_we         <= '0';
-    next_paged_ram_addr <= paged_ram_addr;
-    next_ram_din_a      <= ram_din_a;
-    next_spi_tx_data    <= spi_tx_data;
-    next_spi_wren       <= '0';
-    next_write_en       <= write_en;
-    next_page           <= page;
+  -- comb_proc : process(state, spi_done, spi_req, write_en)
+  -- begin
+  --   -- Default register assignments.
+  --   next_state          <= state;
+  --   next_ram_we         <= '0';
+  --   next_paged_ram_addr <= paged_ram_addr;
+  --   next_ram_din_a      <= ram_din_a;
+  --   next_spi_tx_data    <= spi_tx_data;
+  --   next_spi_wren       <= '0';
+  --   next_write_en       <= write_en;
+  --   next_page           <= page;
 
-    case state is
-    -- Reset the state machine.
-    when RESET_STATE =>
-      next_state <= CMD_STATE;
-      next_paged_ram_addr <= (others => '0');
-      next_ram_din_a <= (others => '0');
-      next_spi_tx_data <= (others => '0');
-      next_write_en <= '0';
+  --   case state is
+  --   -- Reset the state machine.
+  --   when RESET_STATE =>
+  --     next_state <= CMD_STATE;
+  --     next_paged_ram_addr <= (others => '0');
+  --     next_ram_din_a <= (others => '0');
+  --     next_spi_tx_data <= (others => '0');
+  --     next_write_en <= '0';
 
-    -- Wait for a command.
-    when CMD_STATE =>
-      if spi_done = '1' then
-        next_state <= CMD_WAIT_STATE;
+  --   -- Wait for a command.
+  --   when CMD_STATE =>
+  --     if spi_done = '1' then
+  --       next_state <= CMD_WAIT_STATE;
 
-        case to_integer(unsigned(spi_rx_data)) is
-        when READ_COMMAND =>
-          next_write_en <= '0';
-        when WRITE_COMMAND =>
-          next_write_en <= '1';
-        when FLIP_PAGE_COMMAND =>
-          next_page <= not page;
-          next_state <= RESET_STATE;
-        when others =>
-          next_state <= RESET_STATE;
-        end case;
-      end if;
+  --       case to_integer(unsigned(spi_rx_data)) is
+  --       when READ_COMMAND =>
+  --         next_write_en <= '0';
+  --       when WRITE_COMMAND =>
+  --         next_write_en <= '1';
+  --       when FLIP_PAGE_COMMAND =>
+  --         next_page <= not page;
+  --         next_state <= RESET_STATE;
+  --       when others =>
+  --         next_state <= RESET_STATE;
+  --       end case;
+  --     end if;
 
-    when CMD_WAIT_STATE =>
-      if spi_done = '0' then
-        if write_en = '1' then
-          next_state <= WRITE_STATE;
-        else
-          next_state <= READ_STATE;
+  --   when CMD_WAIT_STATE =>
+  --     if spi_done = '0' then
+  --       if write_en = '1' then
+  --         next_state <= WRITE_STATE;
+  --       else
+  --         next_state <= READ_STATE;
 
-          -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
-          next_spi_tx_data <= std_logic_vector(ram_dout_a);
-          next_paged_ram_addr <= paged_ram_addr + 1;
-        end if;
-      end if;
+  --         -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
+  --         next_spi_tx_data <= std_logic_vector(ram_dout_a);
+  --         next_paged_ram_addr <= paged_ram_addr + 1;
+  --       end if;
+  --     end if;
 
-    when READ_STATE =>
-      if spi_req = '1' then
-        next_state <= READ_INC_STATE;
-        next_spi_tx_data <= std_logic_vector(ram_dout_a);
-      end if;
+  --   when READ_STATE =>
+  --     if spi_req = '1' then
+  --       next_state <= READ_INC_STATE;
+  --       next_spi_tx_data <= std_logic_vector(ram_dout_a);
+  --     end if;
 
-    when READ_INC_STATE =>
-      if spi_req = '0' then
-        next_state <= READ_STATE;
+  --   when READ_INC_STATE =>
+  --     if spi_req = '0' then
+  --       next_state <= READ_STATE;
 
-        -- Only allow reading the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_spi_wren <= '1';
-        end if;
+  --       -- Only allow reading the display buffer (0-40h).
+  --       if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+  --         next_spi_wren <= '1';
+  --       end if;
 
-        next_paged_ram_addr <= paged_ram_addr + 1;
-      end if;
+  --       next_paged_ram_addr <= paged_ram_addr + 1;
+  --     end if;
 
-    when WRITE_STATE =>
-      if spi_done = '1' then
-        next_state <= WRITE_INC_STATE;
+  --   when WRITE_STATE =>
+  --     if spi_done = '1' then
+  --       next_state <= WRITE_INC_STATE;
 
-        -- Only allow writing the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_ram_we <= '1';
-        end if;
+  --       -- Only allow writing the display buffer (0-40h).
+  --       if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+  --         next_ram_we <= '1';
+  --       end if;
 
-        next_ram_din_a <= unsigned(spi_rx_data);
-      end if;
+  --       next_ram_din_a <= unsigned(spi_rx_data);
+  --     end if;
 
-    when WRITE_INC_STATE =>
-      if spi_done = '0' then
-        next_state <= WRITE_STATE;
-        next_paged_ram_addr <= paged_ram_addr + 1;
-      end if;
+  --   when WRITE_INC_STATE =>
+  --     if spi_done = '0' then
+  --       next_state <= WRITE_STATE;
+  --       next_paged_ram_addr <= paged_ram_addr + 1;
+  --     end if;
 
-    when others =>
-      next_state <= RESET_STATE;
-    end case;
-  end process comb_proc;
+  --   when others =>
+  --     next_state <= RESET_STATE;
+  --   end case;
+  -- end process comb_proc;
 
   rst <= not locked;
 
   -- Data is read from/written to one page, while display data is read from the
   -- other page.
-  ram_addr_a <= page & paged_ram_addr;
-  ram_addr_b <= (not page) & paged_display_addr;
+  -- ram_addr_a <= page & paged_ram_addr;
+  -- ram_addr_b <= (not page) & paged_display_addr;
+  ram_addr_a <= '0' & paged_ram_addr;
+  ram_addr_b <= '0' & paged_display_addr;
 end arch;

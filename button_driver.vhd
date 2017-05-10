@@ -3,41 +3,47 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
-use work.automata.all;
-
 entity button_driver is
+  generic (
+    DISPLAY_ADDR_WIDTH : natural := 6;
+    RAM_DATA_WIDTH : natural := 8;
+    DISPLAY_WIDTH  : natural := 8
+  );
   port (
-    rst : in std_logic;
     clk : in std_logic;
+    rst : in std_logic;
 
-    -- Display IO
-    row_addr : in std_logic_vector(DISPLAY_HEIGHT_LOG2-1 downto 0);
+    -- Button IO
+    buttons : in unsigned(DISPLAY_WIDTH-1 downto 0);
 
     -- Memory IO
-    addr : out std_logic_vector(ADDR_WIDTH-1 downto 0);
-    data : out std_logic_vector(DATA_WIDTH-1 downto 0);
-    we   : out std_logic;
+    ram_addr : out unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
+    ram_data : out unsigned(RAM_DATA_WIDTH-1 downto 0);
+    ram_we   : out std_logic;
 
     -- Display IO
-    buttons : in std_logic_vector(DISPLAY_WIDTH-1 downto 0)
+    row_addr : in unsigned(2 downto 0)
   );
 end button_driver;
 
 architecture arch of button_driver is
-  signal counter : unsigned(2 downto 0) := (others => '0');
+  signal counter : unsigned(2 downto 0);
 begin
-  process(clk, rst)
+  process(clk)
   begin
-    if rst = '1' then
-    elsif rising_edge(clk) then
-      we <= '1';
-      addr <= row_addr & std_logic_vector(counter);
-      if buttons(to_integer(counter)) = '1' then
-        data <= x"ff";
+    if rising_edge(clk) then
+      if rst = '1' then
+        counter <= (others => '0');
       else
-        data <= x"00";
+        ram_we <= '1';
+        ram_addr <= row_addr & counter;
+        if buttons(to_integer(counter)) = '1' then
+          ram_data <= x"ff";
+        else
+          ram_data <= (others => '0');
+        end if;
+        counter <= counter + 1;
       end if;
-      counter <= counter + 1;
     end if;
   end process;
 end arch;
