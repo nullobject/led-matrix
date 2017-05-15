@@ -8,18 +8,22 @@ entity charlie is
     rst_in : in std_logic;
     clk    : in std_logic;
 
-    -- Display IO
-    rows    : out unsigned(7 downto 0);
-    cols    : out unsigned(7 downto 0);
-    buttons : in  unsigned(7 downto 0);
-
     -- SPI
     ss   : in  std_logic;
     sck  : in  std_logic;
     mosi : in  std_logic;
     miso : out std_logic;
 
-    debug : out std_logic_vector(3 downto 0)
+    -- Matrix IO
+    rows    : out unsigned(7 downto 0);
+    cols    : out unsigned(7 downto 0);
+    buttons : in  unsigned(7 downto 0);
+
+    -- Display IO
+    display_ss   : out std_logic;
+    display_sck  : out std_logic;
+    display_mosi : out std_logic;
+    display_dc   : out std_logic
   );
 end charlie;
 
@@ -69,7 +73,8 @@ architecture arch of charlie is
   -- The current page in memory being displayed.
   signal page, next_page : std_logic;
 
-  signal paged_display_addr : unsigned(MATRIX_ADDR_WIDTH-1 downto 0);
+  signal paged_display_addr : unsigned(DISPLAY_ADDR_WIDTH-1 downto 0);
+  signal paged_matrix_addr : unsigned(MATRIX_ADDR_WIDTH-1 downto 0);
   signal paged_matrix_ram_addr, next_paged_matrix_ram_addr : unsigned(MATRIX_ADDR_WIDTH-1 downto 0);
 begin
   clock_generator : entity work.clock_generator
@@ -112,6 +117,24 @@ begin
       dout_b => matrix_ram_dout_b
     );
 
+  display : entity work.display
+    generic map (
+      ADDR_WIDTH => DISPLAY_ADDR_WIDTH,
+      DATA_WIDTH => DISPLAY_DATA_WIDTH,
+      WIDTH      => DISPLAY_WIDTH,
+      HEIGHT     => DISPLAY_HEIGHT
+    )
+    port map (
+      clk      => clk50,
+      rst      => rst,
+      ram_addr => paged_display_addr,
+      ram_data => display_ram_dout_b,
+      ss       => display_ss,
+      sck      => display_sck,
+      mosi     => display_mosi,
+      dc       => display_dc
+    );
+
   matrix : entity work.matrix
     generic map (
       ADDR_WIDTH => MATRIX_ADDR_WIDTH,
@@ -120,9 +143,9 @@ begin
       HEIGHT     => MATRIX_HEIGHT
     )
     port map (
-      rst         => rst,
       clk         => clk50,
-      ram_addr    => paged_display_addr,
+      rst         => rst,
+      ram_addr    => paged_matrix_addr,
       ram_data    => matrix_ram_dout_b,
       matrix_rows => rows,
       matrix_cols => cols,
@@ -145,7 +168,7 @@ begin
       di_req_o    => spi_req,
       wren_i      => spi_wren,
       wr_ack_o    => spi_wr_ack,
-      state_dbg_o => debug
+      state_dbg_o => open
     );
 
   sync_proc : process(clk50)
@@ -172,14 +195,14 @@ begin
   comb_proc : process(state, spi_done, spi_req, write_en)
   begin
     -- Default register assignments.
-    next_state          <= state;
+    next_state                 <= state;
     next_matrix_ram_we         <= '0';
     next_paged_matrix_ram_addr <= paged_matrix_ram_addr;
     next_matrix_ram_din_a      <= matrix_ram_din_a;
-    next_spi_tx_data    <= spi_tx_data;
-    next_spi_wren       <= '0';
-    next_write_en       <= write_en;
-    next_page           <= page;
+    next_spi_tx_data           <= spi_tx_data;
+    next_spi_wren              <= '0';
+    next_write_en              <= write_en;
+    next_page                  <= page;
 
     case state is
     -- Reset the state machine.
@@ -266,6 +289,7 @@ begin
 
   -- Data is read from/written to one page, while display data is read from the
   -- other page.
+  display_ram_addr_b <= page & paged_display_addr;
   matrix_ram_addr_a <= page & paged_matrix_ram_addr;
-  matrix_ram_addr_b <= (not page) & paged_display_addr;
+  matrix_ram_addr_b <= (not page) & paged_matrix_addr;
 end arch;
