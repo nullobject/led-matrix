@@ -3,7 +3,7 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
--- This block implements a dual-port synchronous BRAM. Port A is read/write
+-- This block implements a dual-port synchronous RAM. Port A is read/write
 -- while port B is read-only.
 --
 -- Adapted from the VHDL Prototyping By Examples book (p251).
