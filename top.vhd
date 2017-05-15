@@ -24,16 +24,21 @@ entity charlie is
 end charlie;
 
 architecture arch of charlie is
+  constant DISPLAY_RAM_ADDR_WIDTH : natural := 12;
+  constant DISPLAY_RAM_DATA_WIDTH : natural := 8;
+  constant DISPLAY_ADDR_WIDTH     : natural := 11;
+  constant DISPLAY_DATA_WIDTH     : natural := 8;
+  constant DISPLAY_WIDTH          : natural := 132;
+  constant DISPLAY_HEIGHT         : natural := 64;
+
   constant MATRIX_RAM_ADDR_WIDTH : natural := 7;
   constant MATRIX_RAM_DATA_WIDTH : natural := 8;
-
-  constant MATRIX_ADDR_WIDTH : natural := 6;
-  constant MATRIX_DATA_WIDTH : natural := 8;
+  constant MATRIX_ADDR_WIDTH     : natural := 6;
+  constant MATRIX_DATA_WIDTH     : natural := 8;
+  constant MATRIX_WIDTH          : natural := 8;
+  constant MATRIX_HEIGHT         : natural := 8;
 
   constant SPI_DATA_WIDTH : natural := 8;
-
-  constant MATRIX_WIDTH  : natural := 8;
-  constant MATRIX_HEIGHT : natural := 8;
 
   constant READ_COMMAND      : integer := 0;
   constant WRITE_COMMAND     : integer := 1;
@@ -48,6 +53,11 @@ architecture arch of charlie is
   signal matrix_ram_addr_a : unsigned(MATRIX_RAM_ADDR_WIDTH-1 downto 0);
   signal matrix_ram_addr_b : unsigned(MATRIX_RAM_ADDR_WIDTH-1 downto 0);
   signal matrix_ram_din_a, next_matrix_ram_din_a, matrix_ram_dout_a, matrix_ram_dout_b : unsigned(MATRIX_RAM_DATA_WIDTH-1 downto 0);
+
+  signal display_ram_we, next_display_ram_we : std_logic;
+  signal display_ram_addr_a : unsigned(DISPLAY_RAM_ADDR_WIDTH-1 downto 0);
+  signal display_ram_addr_b : unsigned(DISPLAY_RAM_ADDR_WIDTH-1 downto 0);
+  signal display_ram_din_a, next_display_ram_din_a, display_ram_dout_a, display_ram_dout_b : unsigned(DISPLAY_RAM_DATA_WIDTH-1 downto 0);
 
   signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(MATRIX_RAM_DATA_WIDTH-1 downto 0);
   signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
@@ -70,6 +80,21 @@ begin
       clkin_ibufg_out => open,
       clk0_out        => clk50,
       locked_out      => locked
+    );
+
+  display_ram : entity work.memory
+    generic map (
+      ADDR_WIDTH => DISPLAY_RAM_ADDR_WIDTH,
+      DATA_WIDTH => DISPLAY_RAM_DATA_WIDTH
+    )
+    port map (
+      clk    => clk50,
+      we     => display_ram_we,
+      addr_a => display_ram_addr_a,
+      din_a  => display_ram_din_a,
+      dout_a => display_ram_dout_a,
+      addr_b => display_ram_addr_b,
+      dout_b => display_ram_dout_b
     );
 
   matrix_ram : entity work.memory
