@@ -37,3 +37,4 @@ NET "display_ss" LOC = "F9" | IOSTANDARD = LVTTL;
 NET "display_sck" LOC = "E9" | IOSTANDARD = LVTTL;
 NET "display_mosi" LOC = "D11" | IOSTANDARD = LVTTL;
 NET "display_dc" LOC = "C11" | IOSTANDARD = LVTTL;
+NET "display_rst" LOC = "F11" | IOSTANDARD = LVTTL;

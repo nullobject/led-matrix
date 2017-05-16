@@ -23,7 +23,8 @@ entity charlie is
     display_ss   : out std_logic;
     display_sck  : out std_logic;
     display_mosi : out std_logic;
-    display_dc   : out std_logic
+    display_dc   : out std_logic;
+    display_rst  : out std_logic
   );
 end charlie;
 
@@ -125,14 +126,15 @@ begin
       HEIGHT     => DISPLAY_HEIGHT
     )
     port map (
-      clk      => clk50,
-      rst      => rst,
-      ram_addr => paged_display_addr,
-      ram_data => display_ram_dout_b,
-      ss       => display_ss,
-      sck      => display_sck,
-      mosi     => display_mosi,
-      dc       => display_dc
+      clk          => clk50,
+      rst          => rst,
+      ram_addr     => paged_display_addr,
+      ram_data     => display_ram_dout_b,
+      display_ss   => display_ss,
+      display_sck  => display_sck,
+      display_mosi => display_mosi,
+      display_dc   => display_dc,
+      display_rst  => display_rst
     );
 
   matrix : entity work.matrix
