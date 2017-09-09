@@ -50,7 +50,7 @@ architecture arch of charlie is
   signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
 
   signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
-  signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
+  signal spi_done, spi_req, spi_wren, next_spi_wren : std_logic;
 
   signal write_en, next_write_en : std_logic;
 
@@ -105,22 +105,18 @@ begin
     );
 
   spi_slave : entity work.spi_slave
-    generic map (
-      N => SPI_DATA_WIDTH
-    )
     port map (
-      clk_i       => clk50,
-      spi_ssel_i  => ss,
-      spi_sck_i   => sck,
-      spi_mosi_i  => mosi,
-      spi_miso_o  => miso,
-      do_o        => spi_rx_data,
-      do_valid_o  => spi_done,
-      di_i        => spi_tx_data,
-      di_req_o    => spi_req,
-      wren_i      => spi_wren,
-      wr_ack_o    => spi_wr_ack,
-      state_dbg_o => debug
+      clk       => clk50,
+      rst       => rst,
+      sclk      => sck,
+      cs_n      => ss,
+      mosi      => mosi,
+      miso      => miso,
+      ready     => spi_req,
+      din       => spi_tx_data,
+      din_vld   => spi_wren,
+      dout      => spi_rx_data,
+      dout_vld  => spi_done
     );
 
   sync_proc : process(clk50)
@@ -134,10 +130,7 @@ begin
         paged_ram_addr <= next_paged_ram_addr;
         ram_din_a <= next_ram_din_a;
         spi_tx_data <= next_spi_tx_data;
-        -- TODO: Debug SPI.
-        -- spi_tx_data <= (others => '1');
-        -- spi_wren <= next_spi_wren;
-        spi_wren <= '1';
+        spi_wren <= next_spi_wren;
         write_en <= next_write_en;
         page <= next_page;
       end if;
