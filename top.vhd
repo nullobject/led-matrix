@@ -50,7 +50,7 @@ architecture arch of charlie is
   signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
 
   signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
-  signal spi_done, spi_req, spi_wren, next_spi_wren : std_logic;
+  signal spi_done : std_logic;
 
   signal write_en, next_write_en : std_logic;
 
@@ -106,17 +106,15 @@ begin
 
   spi_slave : entity work.spi_slave
     port map (
-      clk       => clk50,
-      rst       => rst,
-      sclk      => sck,
-      cs_n      => ss,
-      mosi      => mosi,
-      miso      => miso,
-      ready     => spi_req,
-      din       => spi_tx_data,
-      din_vld   => spi_wren,
-      dout      => spi_rx_data,
-      dout_vld  => spi_done
+      clk   => clk50,
+      rst   => rst,
+      ss    => ss,
+      mosi  => mosi,
+      miso  => miso,
+      sck   => sck,
+      din   => spi_tx_data,
+      dout  => spi_rx_data,
+      done  => spi_done
     );
 
   sync_proc : process(clk50)
@@ -130,14 +128,13 @@ begin
         paged_ram_addr <= next_paged_ram_addr;
         ram_din_a <= next_ram_din_a;
         spi_tx_data <= next_spi_tx_data;
-        spi_wren <= next_spi_wren;
         write_en <= next_write_en;
         page <= next_page;
       end if;
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, spi_done, spi_req, write_en)
+  comb_proc : process(state, spi_done, write_en)
   begin
     -- Default register assignments.
     next_state          <= state;
@@ -145,7 +142,6 @@ begin
     next_paged_ram_addr <= paged_ram_addr;
     next_ram_din_a      <= ram_din_a;
     next_spi_tx_data    <= spi_tx_data;
-    next_spi_wren       <= '0';
     next_write_en       <= write_en;
     next_page           <= page;
 
@@ -190,18 +186,18 @@ begin
       end if;
 
     when READ_STATE =>
-      if spi_req = '1' then
+      if spi_done = '1' then
         next_state <= READ_INC_STATE;
         next_spi_tx_data <= std_logic_vector(ram_dout_a);
       end if;
 
     when READ_INC_STATE =>
-      if spi_req = '0' then
+      if spi_done = '0' then
         next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
         if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_spi_wren <= '1';
+          -- next_spi_wren <= '1';
         end if;
 
         next_paged_ram_addr <= paged_ram_addr + 1;
