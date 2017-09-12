@@ -162,6 +162,9 @@ begin
         case to_integer(unsigned(spi_rx_data)) is
         when READ_COMMAND =>
           next_write_en <= '0';
+
+          -- FIXME: Where do I start sending the data to the master?
+          next_spi_tx_data <= std_logic_vector(ram_dout_a);
         when WRITE_COMMAND =>
           next_write_en <= '1';
         when FLIP_PAGE_COMMAND =>
@@ -178,9 +181,6 @@ begin
           next_state <= WRITE_STATE;
         else
           next_state <= READ_STATE;
-
-          -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
-          next_spi_tx_data <= std_logic_vector(ram_dout_a);
           next_paged_ram_addr <= paged_ram_addr + 1;
         end if;
       end if;
@@ -196,9 +196,9 @@ begin
         next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          -- next_spi_wren <= '1';
-        end if;
+        -- if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+        --   next_spi_wren <= '1';
+        -- end if;
 
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
