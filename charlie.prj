@@ -1,5 +1,5 @@
 vhdl work "gamma.vhd"
-verilog work "spi_slave.v"
+vhdl work "spi_slave.vhd"
 vhdl work "memory.vhd"
 vhdl work "display.vhd"
 vhdl work "clock_generator.vhd"

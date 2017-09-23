@@ -49,8 +49,8 @@ architecture arch of charlie is
   signal ram_addr_b : unsigned(RAM_ADDR_WIDTH-1 downto 0);
   signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
 
-  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
-  signal spi_done : std_logic;
+  signal spi_dout, spi_din, next_spi_din : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
+  signal spi_din_vld, next_spi_din_vld, spi_dout_vld : std_logic;
 
   signal write_en, next_write_en : std_logic;
 
@@ -106,15 +106,16 @@ begin
 
   spi_slave : entity work.spi_slave
     port map (
-      clk   => clk50,
-      rst   => rst,
-      ss    => ss,
-      mosi  => mosi,
-      miso  => miso,
-      sck   => sck,
-      din   => spi_tx_data,
-      dout  => spi_rx_data,
-      done  => spi_done
+      clk      => clk50,
+      rst      => rst,
+      ss       => ss,
+      mosi     => mosi,
+      miso     => miso,
+      sck      => sck,
+      din      => spi_din,
+      din_vld  => spi_din_vld,
+      dout     => spi_dout,
+      dout_vld => spi_dout_vld
     );
 
   sync_proc : process(clk50)
@@ -127,21 +128,23 @@ begin
         ram_we <= next_ram_we;
         paged_ram_addr <= next_paged_ram_addr;
         ram_din_a <= next_ram_din_a;
-        spi_tx_data <= next_spi_tx_data;
+        spi_din <= next_spi_din;
+        spi_din_vld <= next_spi_din_vld;
         write_en <= next_write_en;
         page <= next_page;
       end if;
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, spi_done, write_en)
+  comb_proc : process(state, write_en)
   begin
     -- Default register assignments.
     next_state          <= state;
     next_ram_we         <= '0';
     next_paged_ram_addr <= paged_ram_addr;
     next_ram_din_a      <= ram_din_a;
-    next_spi_tx_data    <= spi_tx_data;
+    next_spi_din        <= spi_din;
+    next_spi_din_vld    <= '0';
     next_write_en       <= write_en;
     next_page           <= page;
 
@@ -151,20 +154,17 @@ begin
       next_state <= CMD_STATE;
       next_paged_ram_addr <= (others => '0');
       next_ram_din_a <= (others => '0');
-      next_spi_tx_data <= (others => '0');
+      next_spi_din <= (others => '0');
       next_write_en <= '0';
 
     -- Wait for a command.
     when CMD_STATE =>
-      if spi_done = '1' then
+      if spi_dout_vld = '1' then
         next_state <= CMD_WAIT_STATE;
 
-        case to_integer(unsigned(spi_rx_data)) is
+        case to_integer(unsigned(spi_dout)) is
         when READ_COMMAND =>
           next_write_en <= '0';
-
-          -- FIXME: Where do I start sending the data to the master?
-          next_spi_tx_data <= std_logic_vector(ram_dout_a);
         when WRITE_COMMAND =>
           next_write_en <= '1';
         when FLIP_PAGE_COMMAND =>
@@ -176,7 +176,7 @@ begin
       end if;
 
     when CMD_WAIT_STATE =>
-      if spi_done = '0' then
+      if spi_dout_vld = '0' then
         if write_en = '1' then
           next_state <= WRITE_STATE;
         else
@@ -186,25 +186,25 @@ begin
       end if;
 
     when READ_STATE =>
-      if spi_done = '1' then
+      if spi_dout_vld = '1' then
         next_state <= READ_INC_STATE;
-        next_spi_tx_data <= std_logic_vector(ram_dout_a);
+        next_spi_din <= std_logic_vector(ram_dout_a);
       end if;
 
     when READ_INC_STATE =>
-      if spi_done = '0' then
+      if spi_dout_vld = '0' then
         next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
-        -- if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-        --   next_spi_wren <= '1';
-        -- end if;
+        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+          next_spi_din_vld <= '1';
+        end if;
 
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
 
     when WRITE_STATE =>
-      if spi_done = '1' then
+      if spi_dout_vld = '1' then
         next_state <= WRITE_INC_STATE;
 
         -- Only allow writing the display buffer (0-40h).
@@ -212,11 +212,11 @@ begin
           next_ram_we <= '1';
         end if;
 
-        next_ram_din_a <= unsigned(spi_rx_data);
+        next_ram_din_a <= unsigned(spi_dout);
       end if;
 
     when WRITE_INC_STATE =>
-      if spi_done = '0' then
+      if spi_dout_vld = '0' then
         next_state <= WRITE_STATE;
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
