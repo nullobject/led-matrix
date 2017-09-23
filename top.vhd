@@ -113,9 +113,9 @@ begin
       miso     => miso,
       sck      => sck,
       din      => spi_din,
-      din_vld  => spi_din_vld,
+      -- din_vld  => spi_din_vld,
       dout     => spi_dout,
-      dout_vld => spi_dout_vld
+      done => spi_dout_vld
     );
 
   sync_proc : process(clk50)
@@ -136,7 +136,7 @@ begin
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, write_en)
+  comb_proc : process(state, write_en, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din, spi_dout, spi_dout_vld)
   begin
     -- Default register assignments.
     next_state          <= state;
@@ -151,11 +151,11 @@ begin
     case state is
     -- Reset the state machine.
     when RESET_STATE =>
-      next_state <= CMD_STATE;
+      next_state          <= CMD_STATE;
       next_paged_ram_addr <= (others => '0');
-      next_ram_din_a <= (others => '0');
-      next_spi_din <= (others => '0');
-      next_write_en <= '0';
+      next_ram_din_a      <= (others => '0');
+      next_spi_din        <= (others => '0');
+      next_write_en       <= '0';
 
     -- Wait for a command.
     when CMD_STATE =>
@@ -177,17 +177,19 @@ begin
 
     when CMD_WAIT_STATE =>
       if spi_dout_vld = '0' then
+        next_paged_ram_addr <= (others => '0');
+
         if write_en = '1' then
           next_state <= WRITE_STATE;
         else
           next_state <= READ_STATE;
-          next_paged_ram_addr <= paged_ram_addr + 1;
         end if;
       end if;
 
     when READ_STATE =>
       if spi_dout_vld = '1' then
         next_state <= READ_INC_STATE;
+      else
         next_spi_din <= std_logic_vector(ram_dout_a);
       end if;
 
@@ -226,6 +228,7 @@ begin
     end case;
   end process comb_proc;
 
+  -- Reset while the clock isn't locked.
   rst <= not locked;
 
   -- Data is read from/written to one page, while display data is read from the

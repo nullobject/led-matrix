@@ -15,10 +15,9 @@ entity spi_slave is
     miso : out std_logic;
 
     -- IO
-    din      : in std_logic_vector(7 downto 0); -- input data for master
-    din_vld  : in std_logic; -- when din_vld = 1, input data are valid and can be accept
-    dout     : out std_logic_vector(7 downto 0); -- output data from master
-    dout_vld : out std_logic -- when dout_vld = 1, output data are valid
+    din  : in std_logic_vector(7 downto 0); -- input data for master
+    dout : out std_logic_vector(7 downto 0); -- output data from master
+    done : out std_logic -- when done = 1, output data are valid
   );
 end spi_slave;
 
@@ -26,16 +25,16 @@ architecture rtl of spi_slave is
   signal sck_reg, old_sck_reg : std_logic;
   signal sck_redge, sck_fedge : std_logic;
   signal bit_ctr : unsigned(2 downto 0);
-  signal data_reg : std_logic_vector(7 downto 0);
+
+  signal ss_reg, next_ss_reg : std_logic;
+  signal mosi_reg, next_mosi_reg : std_logic;
+  signal miso_reg, next_miso_reg : std_logic;
+  signal data_reg, next_data_reg : std_logic_vector(7 downto 0);
+  signal dout_reg, next_dout_reg : std_logic_vector(7 downto 0);
+  signal done_reg, next_done_reg : std_logic;
 begin
-  -- -------------------------------------------------------------------------
-  -- SPI CLOCK REGISTER
-  -- -------------------------------------------------------------------------
-
-  sck_redge <= not old_sck_reg and sck_reg;
-  sck_fedge <= old_sck_reg and not sck_reg;
-
-  spi_clk_reg_p : process (clk)
+  -- Synchronises SCK to the local clock domain.
+  clk_proc : process(clk)
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -48,15 +47,11 @@ begin
     end if;
   end process;
 
-  -- -------------------------------------------------------------------------
-  -- BIT COUNTER
-  -- -------------------------------------------------------------------------
-
   -- Increments the counter on a rising SCK edge.
-  bit_cnt_p : process(clk)
+  cnt_proc : process(clk)
   begin
     if rising_edge(clk) then
-      if rst = '1' or ss = '1' then
+      if rst = '1' or ss_reg = '1' then
         bit_ctr <= (others => '0');
       elsif sck_redge = '1' then
         bit_ctr <= bit_ctr + 1;
@@ -64,44 +59,56 @@ begin
     end if;
   end process;
 
-  -- -------------------------------------------------------------------------
-  -- DATA SHIFT REGISTER
-  -- -------------------------------------------------------------------------
-
-  data_reg_p : process(clk)
+  main_proc : process(clk)
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        data_reg <= (others => '0');
-        dout_vld <= '0';
-      elsif ss = '1' then
-        data_reg <= din;
-        dout_vld <= '0';
-      elsif sck_redge = '1' then
+        miso_reg <= '1';
+        dout_reg <= (others => '0');
+        done_reg <= '0';
+      else
+        miso_reg <= next_miso_reg;
+        dout_reg <= next_dout_reg;
+        done_reg <= next_done_reg;
+      end if;
+
+      ss_reg   <= next_ss_reg;
+      mosi_reg <= next_mosi_reg;
+      data_reg <= next_data_reg;
+    end if;
+  end process;
+
+  comb_proc : process(ss, ss_reg, sck_redge, sck_fedge, mosi, mosi_reg, miso_reg, data_reg, dout_reg, din, bit_ctr)
+  begin
+    next_ss_reg   <= ss;
+    next_mosi_reg <= mosi;
+    next_miso_reg <= miso_reg;
+    next_data_reg <= data_reg;
+    next_dout_reg <= dout_reg;
+    next_done_reg <= '0';
+
+    if ss_reg = '1' then
+      next_data_reg <= din;
+      next_miso_reg <= data_reg(7);
+    else
+      if sck_redge = '1' then
+        next_data_reg <= data_reg(6 downto 0) & mosi_reg;
+
         if bit_ctr = "111" then
-          dout <= data_reg(6 downto 0) & mosi;
-          data_reg <= din;
-          dout_vld <= '1';
-        else
-          data_reg <= data_reg(6 downto 0) & mosi;
-          dout_vld <= '0';
+          next_dout_reg <= data_reg(6 downto 0) & mosi_reg;
+          next_done_reg <= '1';
+          next_data_reg <= din;
         end if;
+      elsif sck_fedge = '1' then
+        next_miso_reg <= data_reg(7);
       end if;
     end if;
   end process;
 
-  -- -------------------------------------------------------------------------
-  -- MISO REGISTER
-  -- -------------------------------------------------------------------------
+  sck_redge <= not old_sck_reg and sck_reg;
+  sck_fedge <= old_sck_reg and not sck_reg;
 
-  miso_p : process(clk)
-  begin
-    if rising_edge(clk) then
-      if rst = '1' then
-        miso <= '1';
-      elsif ss = '1' or sck_fedge = '1' then
-        miso <= data_reg(7);
-      end if;
-    end if;
-  end process;
+  miso <= miso_reg;
+  dout <= dout_reg;
+  done <= done_reg;
 end rtl;
