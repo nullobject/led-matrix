@@ -50,8 +50,8 @@ architecture arch of charlie is
   signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
 
   signal spi_dout, spi_din, next_spi_din : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
-  signal spi_din_vld, next_spi_din_vld, spi_dout_vld : std_logic;
-
+  signal spi_dout_vld : std_logic;
+  signal spi_din_req, spi_wr_ack, spi_write_en, next_spi_write_en : std_logic;
   signal write_en, next_write_en : std_logic;
 
   signal display_row_addr : unsigned(2 downto 0);
@@ -105,17 +105,31 @@ begin
     );
 
   spi_slave : entity work.spi_slave
+    generic map (
+      N => 8,
+      PREFETCH => 1
+    )
     port map (
-      clk      => clk50,
-      rst      => rst,
-      ss       => ss,
-      mosi     => mosi,
-      miso     => miso,
-      sck      => sck,
-      din      => spi_din,
-      -- din_vld  => spi_din_vld,
-      dout     => spi_dout,
-      done => spi_dout_vld
+      clk_i => clk50,
+
+      spi_ssel_i    => ss,
+      spi_sck_i     => sck,
+      spi_mosi_i    => mosi,
+      spi_miso_o    => miso,
+
+      di_req_o      => spi_din_req,
+      di_i          => spi_din,
+      wren_i        => spi_write_en,
+
+      do_o          => spi_dout,
+      do_valid_o    => spi_dout_vld,
+      wr_ack_o      => spi_wr_ack,
+
+      do_transfer_o => open,
+      wren_o        => open,
+      rx_bit_next_o => open,
+      state_dbg_o   => open,
+      sh_reg_dbg_o  => open
     );
 
   sync_proc : process(clk50)
@@ -129,14 +143,14 @@ begin
         paged_ram_addr <= next_paged_ram_addr;
         ram_din_a <= next_ram_din_a;
         spi_din <= next_spi_din;
-        spi_din_vld <= next_spi_din_vld;
+        spi_write_en <= next_spi_write_en;
         write_en <= next_write_en;
         page <= next_page;
       end if;
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, write_en, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din, spi_dout, spi_dout_vld)
+  comb_proc : process(state, write_en, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din_req, spi_din, spi_write_en, spi_dout, spi_dout_vld)
   begin
     -- Default register assignments.
     next_state          <= state;
@@ -144,7 +158,7 @@ begin
     next_paged_ram_addr <= paged_ram_addr;
     next_ram_din_a      <= ram_din_a;
     next_spi_din        <= spi_din;
-    next_spi_din_vld    <= '0';
+    next_spi_write_en   <= spi_write_en;
     next_write_en       <= write_en;
     next_page           <= page;
 
@@ -155,6 +169,7 @@ begin
       next_paged_ram_addr <= (others => '0');
       next_ram_din_a      <= (others => '0');
       next_spi_din        <= (others => '0');
+      next_spi_write_en   <= '0';
       next_write_en       <= '0';
 
     -- Wait for a command.
@@ -166,6 +181,8 @@ begin
         when READ_COMMAND =>
           next_write_en <= '0';
           next_spi_din <= std_logic_vector(ram_dout_a);
+          next_spi_write_en <= '1';
+          next_state <= READ_INC_STATE;
         when WRITE_COMMAND =>
           next_write_en <= '1';
         when FLIP_PAGE_COMMAND =>
@@ -177,29 +194,28 @@ begin
       end if;
 
     when CMD_WAIT_STATE =>
-      if spi_dout_vld = '0' then
-        if write_en = '1' then
+      if write_en = '1' then
+        if spi_dout_vld = '0' then
           next_state <= WRITE_STATE;
-        else
-          next_state <= READ_INC_STATE;
         end if;
+      else
+        next_state <= READ_STATE;
       end if;
 
     when READ_STATE =>
-      if spi_dout_vld = '1' then
+      if spi_din_req = '1' then
         next_state <= READ_INC_STATE;
         next_spi_din <= std_logic_vector(ram_dout_a);
+        -- Only allow reading the display buffer (0-40h).
+        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+          next_spi_write_en <= '1';
+        end if;
       end if;
 
     when READ_INC_STATE =>
-      if spi_dout_vld = '0' then
+      if spi_din_req = '0' then
         next_state <= READ_STATE;
-
-        -- Only allow reading the display buffer (0-40h).
-        -- if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-        --   next_spi_din_vld <= '1';
-        -- end if;
-
+        next_spi_write_en <= '0';
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
 
