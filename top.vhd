@@ -165,6 +165,7 @@ begin
         case to_integer(unsigned(spi_dout)) is
         when READ_COMMAND =>
           next_write_en <= '0';
+          next_spi_din <= std_logic_vector(ram_dout_a);
         when WRITE_COMMAND =>
           next_write_en <= '1';
         when FLIP_PAGE_COMMAND =>
@@ -177,19 +178,16 @@ begin
 
     when CMD_WAIT_STATE =>
       if spi_dout_vld = '0' then
-        next_paged_ram_addr <= (others => '0');
-
         if write_en = '1' then
           next_state <= WRITE_STATE;
         else
-          next_state <= READ_STATE;
+          next_state <= READ_INC_STATE;
         end if;
       end if;
 
     when READ_STATE =>
       if spi_dout_vld = '1' then
         next_state <= READ_INC_STATE;
-      else
         next_spi_din <= std_logic_vector(ram_dout_a);
       end if;
 
@@ -198,9 +196,9 @@ begin
         next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
-        if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_spi_din_vld <= '1';
-        end if;
+        -- if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
+        --   next_spi_din_vld <= '1';
+        -- end if;
 
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
