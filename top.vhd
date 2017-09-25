@@ -39,7 +39,7 @@ architecture arch of charlie is
   constant WRITE_COMMAND     : integer := 1;
   constant FLIP_PAGE_COMMAND : integer := 2;
 
-  type state_type is (RESET_STATE, CMD_STATE, CMD_WAIT_STATE, WRITE_STATE, READ_STATE, READ_INC_STATE, WRITE_INC_STATE);
+  type state_type is (RESET_STATE, CMD_STATE, WRITE_WAIT_STATE, WRITE_STATE, READ_STATE, READ_INC_STATE, WRITE_INC_STATE);
   signal state, next_state : state_type;
 
   signal clk10, clk50, locked, rst : std_logic;
@@ -52,7 +52,6 @@ architecture arch of charlie is
   signal spi_dout, spi_din, next_spi_din : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
   signal spi_dout_vld : std_logic;
   signal spi_din_req, spi_wr_ack, spi_write_en, next_spi_write_en : std_logic;
-  signal write_en, next_write_en : std_logic;
 
   signal display_row_addr : unsigned(2 downto 0);
 
@@ -112,18 +111,18 @@ begin
     port map (
       clk_i => clk50,
 
-      spi_ssel_i    => ss,
-      spi_sck_i     => sck,
-      spi_mosi_i    => mosi,
-      spi_miso_o    => miso,
+      spi_ssel_i => ss,
+      spi_sck_i  => sck,
+      spi_mosi_i => mosi,
+      spi_miso_o => miso,
 
-      di_req_o      => spi_din_req,
-      di_i          => spi_din,
-      wren_i        => spi_write_en,
+      di_req_o => spi_din_req,
+      di_i     => spi_din,
+      wren_i   => spi_write_en,
 
-      do_o          => spi_dout,
-      do_valid_o    => spi_dout_vld,
-      wr_ack_o      => spi_wr_ack,
+      do_o       => spi_dout,
+      do_valid_o => spi_dout_vld,
+      wr_ack_o   => spi_wr_ack,
 
       do_transfer_o => open,
       wren_o        => open,
@@ -144,13 +143,12 @@ begin
         ram_din_a <= next_ram_din_a;
         spi_din <= next_spi_din;
         spi_write_en <= next_spi_write_en;
-        write_en <= next_write_en;
         page <= next_page;
       end if;
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, write_en, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din_req, spi_din, spi_write_en, spi_dout, spi_dout_vld)
+  comb_proc : process(state, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din_req, spi_din, spi_write_en, spi_dout, spi_dout_vld)
   begin
     -- Default register assignments.
     next_state          <= state;
@@ -159,7 +157,6 @@ begin
     next_ram_din_a      <= ram_din_a;
     next_spi_din        <= spi_din;
     next_spi_write_en   <= spi_write_en;
-    next_write_en       <= write_en;
     next_page           <= page;
 
     case state is
@@ -170,36 +167,25 @@ begin
       next_ram_din_a      <= (others => '0');
       next_spi_din        <= (others => '0');
       next_spi_write_en   <= '0';
-      next_write_en       <= '0';
 
     -- Wait for a command.
     when CMD_STATE =>
       if spi_dout_vld = '1' then
-        next_state <= CMD_WAIT_STATE;
+        next_state <= WRITE_WAIT_STATE;
 
         case to_integer(unsigned(spi_dout)) is
         when READ_COMMAND =>
-          next_write_en <= '0';
           next_spi_din <= std_logic_vector(ram_dout_a);
           next_spi_write_en <= '1';
           next_state <= READ_INC_STATE;
         when WRITE_COMMAND =>
-          next_write_en <= '1';
+          next_state <= WRITE_WAIT_STATE;
         when FLIP_PAGE_COMMAND =>
           next_page <= not page;
           next_state <= RESET_STATE;
         when others =>
           next_state <= RESET_STATE;
         end case;
-      end if;
-
-    when CMD_WAIT_STATE =>
-      if write_en = '1' then
-        if spi_dout_vld = '0' then
-          next_state <= WRITE_STATE;
-        end if;
-      else
-        next_state <= READ_STATE;
       end if;
 
     when READ_STATE =>
@@ -217,6 +203,11 @@ begin
         next_state <= READ_STATE;
         next_spi_write_en <= '0';
         next_paged_ram_addr <= paged_ram_addr + 1;
+      end if;
+
+    when WRITE_WAIT_STATE =>
+      if spi_dout_vld = '0' then
+        next_state <= WRITE_STATE;
       end if;
 
     when WRITE_STATE =>
