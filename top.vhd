@@ -236,8 +236,7 @@ begin
   -- Reset while the clock isn't locked.
   rst <= not locked;
 
-  -- Data is read from/written to one page, while display data is read from the
-  -- other page.
+  -- Data is read from/written to page A, while display data is read from page B.
   ram_addr_a <= page & paged_ram_addr;
   ram_addr_b <= (not page) & paged_display_addr;
 end arch;
