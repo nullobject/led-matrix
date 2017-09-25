@@ -178,30 +178,35 @@ begin
           next_spi_din <= std_logic_vector(ram_dout_a);
           next_spi_write_en <= '1';
           next_state <= READ_INC_STATE;
+
         when WRITE_COMMAND =>
           next_state <= WRITE_WAIT_STATE;
+
         when FLIP_PAGE_COMMAND =>
           next_page <= not page;
           next_state <= RESET_STATE;
+
         when others =>
           next_state <= RESET_STATE;
+
         end case;
       end if;
 
     when READ_STATE =>
       if spi_din_req = '1' then
         next_state <= READ_INC_STATE;
-        next_spi_din <= std_logic_vector(ram_dout_a);
+
         -- Only allow reading the display buffer (0-40h).
         if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
           next_spi_write_en <= '1';
         end if;
+
+        next_spi_din <= std_logic_vector(ram_dout_a);
       end if;
 
     when READ_INC_STATE =>
       if spi_din_req = '0' then
         next_state <= READ_STATE;
-        next_spi_write_en <= '0';
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
 
