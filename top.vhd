@@ -39,7 +39,7 @@ architecture arch of charlie is
   constant WRITE_COMMAND     : integer := 1;
   constant FLIP_PAGE_COMMAND : integer := 2;
 
-  type state_type is (RESET_STATE, CMD_STATE, CMD_WAIT_STATE, WRITE_STATE, READ_STATE, READ_INC_STATE, WRITE_INC_STATE);
+  type state_type is (RESET_STATE, CMD_STATE, WRITE_WAIT_STATE, WRITE_STATE, READ_STATE, READ_INC_STATE, WRITE_INC_STATE);
   signal state, next_state : state_type;
 
   signal clk10, clk50, locked, rst : std_logic;
@@ -49,10 +49,9 @@ architecture arch of charlie is
   signal ram_addr_b : unsigned(RAM_ADDR_WIDTH-1 downto 0);
   signal ram_din_a, next_ram_din_a, ram_dout_a, ram_dout_b : unsigned(RAM_DATA_WIDTH-1 downto 0);
 
-  signal spi_rx_data, spi_tx_data, next_spi_tx_data : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
-  signal spi_done, spi_req, spi_wren, next_spi_wren, spi_wr_ack : std_logic;
-
-  signal write_en, next_write_en : std_logic;
+  signal spi_dout, spi_din, next_spi_din : std_logic_vector(RAM_DATA_WIDTH-1 downto 0);
+  signal spi_dout_vld : std_logic;
+  signal spi_din_req, spi_wr_ack, spi_write_en, next_spi_write_en : std_logic;
 
   signal display_row_addr : unsigned(2 downto 0);
 
@@ -106,21 +105,30 @@ begin
 
   spi_slave : entity work.spi_slave
     generic map (
-      N => SPI_DATA_WIDTH
+      N => 8,
+      PREFETCH => 1
     )
     port map (
-      clk_i       => clk50,
-      spi_ssel_i  => ss,
-      spi_sck_i   => sck,
-      spi_mosi_i  => mosi,
-      spi_miso_o  => miso,
-      do_o        => spi_rx_data,
-      do_valid_o  => spi_done,
-      di_i        => spi_tx_data,
-      di_req_o    => spi_req,
-      wren_i      => spi_wren,
-      wr_ack_o    => spi_wr_ack,
-      state_dbg_o => debug
+      clk_i => clk50,
+
+      spi_ssel_i => ss,
+      spi_sck_i  => sck,
+      spi_mosi_i => mosi,
+      spi_miso_o => miso,
+
+      di_req_o => spi_din_req,
+      di_i     => spi_din,
+      wren_i   => spi_write_en,
+
+      do_o       => spi_dout,
+      do_valid_o => spi_dout_vld,
+      wr_ack_o   => spi_wr_ack,
+
+      do_transfer_o => open,
+      wren_o        => open,
+      rx_bit_next_o => open,
+      state_dbg_o   => open,
+      sh_reg_dbg_o  => open
     );
 
   sync_proc : process(clk50)
@@ -133,89 +141,82 @@ begin
         ram_we <= next_ram_we;
         paged_ram_addr <= next_paged_ram_addr;
         ram_din_a <= next_ram_din_a;
-        spi_tx_data <= next_spi_tx_data;
-        -- TODO: Debug SPI.
-        -- spi_tx_data <= (others => '1');
-        -- spi_wren <= next_spi_wren;
-        spi_wren <= '1';
-        write_en <= next_write_en;
+        spi_din <= next_spi_din;
+        spi_write_en <= next_spi_write_en;
         page <= next_page;
       end if;
     end if;
   end process sync_proc;
 
-  comb_proc : process(state, spi_done, spi_req, write_en)
+  comb_proc : process(state, page, paged_ram_addr, ram_din_a, ram_dout_a, spi_din_req, spi_din, spi_write_en, spi_dout, spi_dout_vld)
   begin
     -- Default register assignments.
     next_state          <= state;
     next_ram_we         <= '0';
     next_paged_ram_addr <= paged_ram_addr;
     next_ram_din_a      <= ram_din_a;
-    next_spi_tx_data    <= spi_tx_data;
-    next_spi_wren       <= '0';
-    next_write_en       <= write_en;
+    next_spi_din        <= spi_din;
+    next_spi_write_en   <= spi_write_en;
     next_page           <= page;
 
     case state is
     -- Reset the state machine.
     when RESET_STATE =>
-      next_state <= CMD_STATE;
+      next_state          <= CMD_STATE;
       next_paged_ram_addr <= (others => '0');
-      next_ram_din_a <= (others => '0');
-      next_spi_tx_data <= (others => '0');
-      next_write_en <= '0';
+      next_ram_din_a      <= (others => '0');
+      next_spi_din        <= (others => '0');
+      next_spi_write_en   <= '0';
 
     -- Wait for a command.
     when CMD_STATE =>
-      if spi_done = '1' then
-        next_state <= CMD_WAIT_STATE;
+      if spi_dout_vld = '1' then
+        next_state <= WRITE_WAIT_STATE;
 
-        case to_integer(unsigned(spi_rx_data)) is
+        case to_integer(unsigned(spi_dout)) is
         when READ_COMMAND =>
-          next_write_en <= '0';
+          next_spi_din <= std_logic_vector(ram_dout_a);
+          next_spi_write_en <= '1';
+          next_state <= READ_INC_STATE;
+
         when WRITE_COMMAND =>
-          next_write_en <= '1';
+          next_state <= WRITE_WAIT_STATE;
+
         when FLIP_PAGE_COMMAND =>
           next_page <= not page;
           next_state <= RESET_STATE;
+
         when others =>
           next_state <= RESET_STATE;
+
         end case;
       end if;
 
-    when CMD_WAIT_STATE =>
-      if spi_done = '0' then
-        if write_en = '1' then
-          next_state <= WRITE_STATE;
-        else
-          next_state <= READ_STATE;
-
-          -- Why does this need to be set here? It must have started writing requesting the SPI data at this point.
-          next_spi_tx_data <= std_logic_vector(ram_dout_a);
-          next_paged_ram_addr <= paged_ram_addr + 1;
-        end if;
-      end if;
-
     when READ_STATE =>
-      if spi_req = '1' then
+      if spi_din_req = '1' then
         next_state <= READ_INC_STATE;
-        next_spi_tx_data <= std_logic_vector(ram_dout_a);
-      end if;
-
-    when READ_INC_STATE =>
-      if spi_req = '0' then
-        next_state <= READ_STATE;
 
         -- Only allow reading the display buffer (0-40h).
         if to_integer(paged_ram_addr) < DISPLAY_WIDTH*DISPLAY_HEIGHT then
-          next_spi_wren <= '1';
+          next_spi_write_en <= '1';
         end if;
 
+        next_spi_din <= std_logic_vector(ram_dout_a);
+      end if;
+
+    when READ_INC_STATE =>
+      if spi_din_req = '0' then
+        next_state <= READ_STATE;
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
 
+    when WRITE_WAIT_STATE =>
+      if spi_dout_vld = '0' then
+        next_state <= WRITE_STATE;
+      end if;
+
     when WRITE_STATE =>
-      if spi_done = '1' then
+      if spi_dout_vld = '1' then
         next_state <= WRITE_INC_STATE;
 
         -- Only allow writing the display buffer (0-40h).
@@ -223,11 +224,11 @@ begin
           next_ram_we <= '1';
         end if;
 
-        next_ram_din_a <= unsigned(spi_rx_data);
+        next_ram_din_a <= unsigned(spi_dout);
       end if;
 
     when WRITE_INC_STATE =>
-      if spi_done = '0' then
+      if spi_dout_vld = '0' then
         next_state <= WRITE_STATE;
         next_paged_ram_addr <= paged_ram_addr + 1;
       end if;
@@ -237,10 +238,10 @@ begin
     end case;
   end process comb_proc;
 
+  -- Reset while the clock isn't locked.
   rst <= not locked;
 
-  -- Data is read from/written to one page, while display data is read from the
-  -- other page.
+  -- Data is read from/written to page A, while display data is read from page B.
   ram_addr_a <= page & paged_ram_addr;
   ram_addr_b <= (not page) & paged_display_addr;
 end arch;
